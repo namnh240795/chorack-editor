@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "post-submit": {
+      "command": "bash .claude/hooks/post-submit.sh",
+      "description": "Send task completion notification to Discord"
+    }
+  }
+}
