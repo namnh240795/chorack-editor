@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReactFlow Sample Generator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      font-size: 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      display: none;
+    }
+    #status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    #status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background: #e7f3ff;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      border-left: 4px solid #2196F3;
+    }
+    .info h3 {
+      margin-top: 0;
+      color: #1976D2;
+    }
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 ReactFlow Sample Generator</h1>
+    <p class="subtitle">One-click sample document creation</p>
+
+    <div class="info">
+      <h3>📋 What this creates:</h3>
+      <ul>
+        <li><strong>1 document</strong>: "🎯 ReactFlow Demo - Inline Layout & Scaling"</li>
+        <li><strong>6 flow diagrams</strong> with nodes and edges</li>
+        <li><strong>Demo layouts</strong>: 2 side-by-side, 1 large, 3 small in a row</li>
+      </ul>
+      <p>After generation, open <a href="http://localhost:5173" target="_blank">http://localhost:5173</a> to see the sample!</p>
+    </div>
+
+    <button onclick="generateSample()">🚀 Generate Sample Document</button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    async function generateSample() {
+      const statusEl = document.getElementById('status');
+      const button = document.querySelector('button');
+
+      try {
+        button.disabled = true;
+        button.textContent = '⏳ Generating...';
+        statusEl.style.display = 'none';
+
+        // Open database
+        const db = await new Promise((resolve, reject) => {
+          const request = indexedDB.open('chorack-editor', 1);
+
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('documents')) {
+              db.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains('nodes')) {
+              const nodeStore = db.createObjectStore('nodes', { keyPath: 'id', autoIncrement: true });
+              nodeStore.createIndex('documentId', 'documentId', { unique: false });
+              nodeStore.createIndex('flowId', 'flowId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('edges')) {
+              const edgeStore = db.createObjectStore('edges', { keyPath: 'id', autoIncrement: true });
+              edgeStore.createIndex('documentId', 'documentId', { unique: false });
+              edgeStore.createIndex('flowId', 'flowId', { unique: false });
+            }
+          };
+        });
+
+        // Clear existing data
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(['documents', 'nodes', 'edges'], 'readwrite');
+          tx.objectStore('documents').clear();
+          tx.objectStore('nodes').clear();
+          tx.objectStore('edges').clear();
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+
+        // Create document
+        const docContent = `
+<h1>ReactFlow Demo Document</h1>
+
+<h2>✨ Features to Test:</h2>
+<ul>
+  <li><strong>Inline Layout:</strong> Multiple diagrams on the same line</li>
+  <li><strong>Scaling:</strong> Resize using drag handles (8 directions)</li>
+  <li><strong>Background:</strong> White background scales with container</li>
+</ul>
+
+<h2>📊 Example 1: Two Diagrams Side by Side</h2>
+<p>These two 400x300 diagrams sit on the same line:</p>
+
+<react-flow-node-view flow-id="demo-1" width="400" height="300"></react-flow-node-view>
+<react-flow-node-view flow-id="demo-2" width="400" height="300"></react-flow-node-view>
+
+<h2>📐 Example 2: Large Diagram (800x400)</h2>
+<p>A larger resizable diagram:</p>
+
+<react-flow-node-view flow-id="demo-3" width="800" height="400"></react-flow-node-view>
+
+<h2>🔢 Example 3: Three Small Diagrams (300x250 each)</h2>
+<p>Three diagrams flowing inline:</p>
+
+<react-flow-node-view flow-id="demo-4" width="300" height="250"></react-flow-node-view>
+<react-flow-node-view flow-id="demo-5" width="300" height="250"></react-flow-node-view>
+<react-flow-node-view flow-id="demo-6" width="300" height="250"></react-flow-node-view>
+
+<h2>💡 How to Use:</h2>
+<ol>
+  <li><strong>Resize:</strong> Drag any corner or edge handle</li>
+  <li><strong>Fullscreen:</strong> Click the fullscreen button (top-right)</li>
+  <li><strong>Add New:</strong> Type /flow in the editor</li>
+  <li><strong>Inline:</strong> Diagrams auto-flow like inline images</li>
+</ol>
+
+<hr>
+
+<h3>Technical Notes:</h3>
+<ul>
+  <li>Minimum size: 300x200</li>
+  <li>Maximum size: 1200x800</li>
+  <li>Zoom range: 0.2x to 2x</li>
+  <li>Background: White with dot pattern</li>
+</ul>
+        `;
+
+        const docId = await new Promise((resolve, reject) => {
+          const tx = db.transaction('documents', 'readwrite');
+          const request = tx.objectStore('documents').add({
+            title: '🎯 ReactFlow Demo - Inline Layout & Scaling',
+            content: docContent,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        // Flow data
+        const flows = [
+          {
+            flowId: 'demo-1',
+            nodes: [
+              { id: '1', type: 'input', data: { label: 'Start' }, position: { x: 50, y: 50 } },
+              { id: '2', data: { label: 'Process A' }, position: { x: 150, y: 50 } },
+              { id: '3', type: 'output', data: { label: 'End' }, position: { x: 280, y: 50 } }
+            ],
+            edges: [
+              { id: 'e1', source: '1', target: '2' },
+              { id: 'e2', source: '2', target: '3' }
+            ]
+          },
+          {
+            flowId: 'demo-2',
+            nodes: [
+              { id: '1', type: 'input', data: { label: 'Input' }, position: { x: 50, y: 80 } },
+              { id: '2', data: { label: 'Check' }, position: { x: 150, y: 80 } },
+              { id: '3', data: { label: 'Pass ✓' }, position: { x: 280, y: 40 } },
+              { id: '4', data: { label: 'Fail ✗' }, position: { x: 280, y: 120 } }
+            ],
+            edges: [
+              { id: 'e1', source: '1', target: '2' },
+              { id: 'e2', source: '2', target: '3', label: 'yes' },
+              { id: 'e3', source: '2', target: '4', label: 'no' }
+            ]
+          },
+          {
+            flowId: 'demo-3',
+            nodes: [
+              { id: '1', type: 'input', data: { label: 'Start' }, position: { x: 50, y: 150 } },
+              { id: '2', data: { label: 'Step 1' }, position: { x: 180, y: 150 } },
+              { id: '3', data: { label: 'Step 2' }, position: { x: 310, y: 150 } },
+              { id: '4', data: { label: 'Step 3' }, position: { x: 440, y: 150 } },
+              { id: '5', data: { label: 'Step 4' }, position: { x: 570, y: 150 } },
+              { id: '6', type: 'output', data: { label: 'Finish' }, position: { x: 700, y: 150 } }
+            ],
+            edges: [
+              { id: 'e1', source: '1', target: '2' },
+              { id: 'e2', source: '2', target: '3' },
+              { id: 'e3', source: '3', target: '4' },
+              { id: 'e4', source: '4', target: '5' },
+              { id: 'e5', source: '5', target: '6' }
+            ]
+          },
+          {
+            flowId: 'demo-4',
+            nodes: [
+              { id: '1', type: 'input', data: { label: 'A→B' }, position: { x: 50, y: 50 } },
+              { id: '2', data: { label: 'B→C' }, position: { x: 140, y: 50 } },
+              { id: '3', type: 'output', data: { label: 'C→End' }, position: { x: 220, y: 50 } }
+            ],
+            edges: [
+              { id: 'e1', source: '1', target: '2' },
+              { id: 'e2', source: '2', target: '3' }
+            ]
+          },
+          {
+            flowId: 'demo-5',
+            nodes: [
+              { id: '1', type: 'input', data: { label: 'X→Y' }, position: { x: 50, y: 50 } },
+              { id: '2', data: { label: 'Y→Z' }, position: { x: 140, y: 50 } },
+              { id: '3', type: 'output', data: { label: 'Z→End' }, position: { x: 220, y: 50 } }
+            ],
+            edges: [
+              { id: 'e1', source: '1', target: '2' },
+              { id: 'e2', source: '2', target: '3' }
+            ]
+          },
+          {
+            flowId: 'demo-6',
+            nodes: [
+              { id: '1', type: 'input', data: { label: 'P→Q' }, position: { x: 50, y: 50 } },
+              { id: '2', data: { label: 'Q→R' }, position: { x: 140, y: 50 } },
+              { id: '3', type: 'output', data: { label: 'R→End' }, position: { x: 220, y: 50 } }
+            ],
+            edges: [
+              { id: 'e1', source: '1', target: '2' },
+              { id: 'e2', source: '2', target: '3' }
+            ]
+          }
+        ];
+
+        // Add all flows
+        for (const flow of flows) {
+          for (const node of flow.nodes) {
+            await new Promise((resolve, reject) => {
+              const tx = db.transaction('nodes', 'readwrite');
+              tx.objectStore('nodes').add({
+                documentId: docId,
+                flowId: flow.flowId,
+                nodeId: node.id,
+                type: node.type || 'default',
+                data: node.data,
+                position: node.position
+              });
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+            });
+          }
+
+          for (const edge of flow.edges) {
+            await new Promise((resolve, reject) => {
+              const tx = db.transaction('edges', 'readwrite');
+              tx.objectStore('edges').add({
+                documentId: docId,
+                flowId: flow.flowId,
+                edgeId: edge.id,
+                source: edge.source,
+                target: edge.target,
+                data: edge.label ? { label: edge.label } : {}
+              });
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+            });
+          }
+        }
+
+        // Success!
+        statusEl.className = 'success';
+        statusEl.innerHTML = `
+          <h3>✅ Sample Generated Successfully!</h3>
+          <p><strong>Document created:</strong> "🎯 ReactFlow Demo - Inline Layout & Scaling"</p>
+          <p><strong>Flows created:</strong> 6 (demo-1 through demo-6)</p>
+          <hr style="margin: 15px 0;">
+          <p><strong>Next Steps:</strong></p>
+          <ol>
+            <li>Open <a href="http://localhost:5173" target="_blank" style="color: #1976D2;">http://localhost:5173</a></li>
+            <li>Click on "🎯 ReactFlow Demo - Inline Layout & Scaling"</li>
+            <li>Test the features:
+              <ul>
+                <li>✓ Resize diagrams (drag corners/edges)</li>
+                <li>✓ Try fullscreen mode</li>
+                <li>✓ See 2 diagrams side-by-side</li>
+                <li>✓ See 3 small diagrams in a row</li>
+              </ul>
+            </li>
+          </ol>
+        `;
+        statusEl.style.display = 'block';
+        button.textContent = '✅ Done!';
+
+      } catch (error) {
+        console.error('Error:', error);
+        statusEl.className = 'error';
+        statusEl.innerHTML = `
+          <h3>❌ Error</h3>
+          <p>${error.message}</p>
+          <p><strong>Make sure the dev server is running:</strong> <code>pnpm dev</code></p>
+        `;
+        statusEl.style.display = 'block';
+        button.disabled = false;
+        button.textContent = '🚀 Try Again';
+      }
+    }
+  </script>
+</body>
+</html>

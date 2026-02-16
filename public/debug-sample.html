@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug - Sample Generator</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #log {
+      background: #1e1e1e;
+      color: #00ff00;
+      padding: 15px;
+      border-radius: 4px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 13px;
+      margin-top: 20px;
+    }
+    .log-entry {
+      margin: 5px 0;
+    }
+    .success { color: #00ff00; }
+    .error { color: #ff6b6b; }
+    .info { color: #4fc3f7; }
+    .warning { color: #ffd93d; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Debug - Sample Generator</h1>
+
+    <div>
+      <button onclick="checkDatabase()">1️⃣ Check Database</button>
+      <button onclick="createSample()">2️⃣ Create Sample</button>
+      <button onclick="verifyData()">3️⃣ Verify Data</button>
+      <button onclick="showInstructions()">4️⃣ Show Instructions</button>
+    </div>
+
+    <div id="log"></div>
+  </div>
+
+  <script>
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(message);
+    }
+
+    async function checkDatabase() {
+      log('🔍 Checking database...', 'info');
+
+      try {
+        const request = indexedDB.open('chorack-editor', 1);
+
+        request.onsuccess = () => {
+          log('✅ Database opened successfully', 'success');
+          const db = request.result;
+
+          // Check object stores
+          const storeNames = Array.from(db.objectStoreNames);
+          log(`📦 Object stores: ${storeNames.join(', ')}`, 'info');
+
+          // Count documents
+          const tx = db.transaction('documents', 'readonly');
+          const countReq = tx.objectStore('documents').count();
+
+          countReq.onsuccess = () => {
+            log(`📄 Documents in database: ${countReq.result}`, 'info');
+          };
+        };
+
+        request.onerror = () => {
+          log(`❌ Database error: ${request.error}`, 'error');
+        };
+
+        request.onupgradeneeded = () => {
+          log('⚠️ Database needs upgrade - creating schema...', 'warning');
+        };
+
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    async function createSample() {
+      log('🚀 Starting sample creation...', 'info');
+
+      try {
+        const db = await new Promise((resolve, reject) => {
+          const request = indexedDB.open('chorack-editor', 1);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        log('✅ Database opened', 'success');
+
+        // Clear existing data
+        log('🗑️  Clearing existing data...', 'info');
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(['documents', 'nodes', 'edges'], 'readwrite');
+          tx.objectStore('documents').clear();
+          tx.objectStore('nodes').clear();
+          tx.objectStore('edges').clear();
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        log('✅ Data cleared', 'success');
+
+        // Create document
+        const docContent = `<h1>ReactFlow Demo</h1><h2>Example 1: Two Diagrams Side by Side</h2><react-flow-node-view flow-id="demo-1" width="400" height="300"></react-flow-node-view><react-flow-node-view flow-id="demo-2" width="400" height="300"></react-flow-node-view><h2>Example 2: Large Diagram</h2><react-flow-node-view flow-id="demo-3" width="800" height="400"></react-flow-node-view><h2>Example 3: Three Small Diagrams</h2><react-flow-node-view flow-id="demo-4" width="300" height="250"></react-flow-node-view><react-flow-node-view flow-id="demo-5" width="300" height="250"></react-flow-node-view><react-flow-node-view flow-id="demo-6" width="300" height="250"></react-flow-node-view>`;
+
+        const docId = await new Promise((resolve, reject) => {
+          const tx = db.transaction('documents', 'readwrite');
+          const request = tx.objectStore('documents').add({
+            title: '🎯 ReactFlow Demo - Inline Layout & Scaling',
+            content: docContent,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        log(`✅ Document created with ID: ${docId}`, 'success');
+
+        // Create simple flows
+        for (let i = 1; i <= 6; i++) {
+          const flowId = `demo-${i}`;
+
+          // Add nodes
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction('nodes', 'readwrite');
+            tx.objectStore('nodes').add({
+              documentId: docId,
+              flowId: flowId,
+              nodeId: '1',
+              type: 'input',
+              data: { label: 'Start' },
+              position: { x: 50, y: 50 }
+            });
+            tx.objectStore('nodes').add({
+              documentId: docId,
+              flowId: flowId,
+              nodeId: '2',
+              type: 'default',
+              data: { label: 'Process' },
+              position: { x: 150, y: 50 }
+            });
+            tx.objectStore('nodes').add({
+              documentId: docId,
+              flowId: flowId,
+              nodeId: '3',
+              type: 'output',
+              data: { label: 'End' },
+              position: { x: 250, y: 50 }
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+
+          // Add edges
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction('edges', 'readwrite');
+            tx.objectStore('edges').add({
+              documentId: docId,
+              flowId: flowId,
+              edgeId: 'e1',
+              source: '1',
+              target: '2',
+              data: {}
+            });
+            tx.objectStore('edges').add({
+              documentId: docId,
+              flowId: flowId,
+              edgeId: 'e2',
+              source: '2',
+              target: '3',
+              data: {}
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+
+          log(`✅ Flow "${flowId}" created`, 'success');
+        }
+
+        log('🎉 Sample creation complete!', 'success');
+        showInstructions();
+
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, 'error');
+        console.error(error);
+      }
+    }
+
+    async function verifyData() {
+      log('🔍 Verifying created data...', 'info');
+
+      try {
+        const db = await new Promise((resolve, reject) => {
+          const request = indexedDB.open('chorack-editor', 1);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        // Count documents
+        const docCount = await new Promise((resolve, reject) => {
+          const tx = db.transaction('documents', 'readonly');
+          const req = tx.objectStore('documents').count();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+
+        log(`📄 Documents: ${docCount}`, 'info');
+
+        // Get all documents
+        const docs = await new Promise((resolve, reject) => {
+          const tx = db.transaction('documents', 'readonly');
+          const req = tx.objectStore('documents').getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+
+        docs.forEach(doc => {
+          log(`  - "${doc.title}" (ID: ${doc.id})`, 'info');
+        });
+
+        // Count nodes and edges
+        const nodeCount = await new Promise((resolve, reject) => {
+          const tx = db.transaction('nodes', 'readonly');
+          const req = tx.objectStore('nodes').count();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+
+        const edgeCount = await new Promise((resolve, reject) => {
+          const tx = db.transaction('edges', 'readonly');
+          const req = tx.objectStore('edges').count();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+
+        log(`📦 Nodes: ${nodeCount}`, 'info');
+        log(`🔗 Edges: ${edgeCount}`, 'info');
+
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    function showInstructions() {
+      log('', 'info');
+      log('📖 NEXT STEPS:', 'success');
+      log('1. Go to: http://localhost:5173', 'info');
+      log('2. Refresh the page (F5 or Cmd+R)', 'info');
+      log('3. Click on "🎯 ReactFlow Demo - Inline Layout & Scaling"', 'info');
+      log('4. You should see 6 flow diagrams!', 'info');
+      log('', 'info');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>One-Click Sample Generator</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 600px;
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    p {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      font-size: 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    #message {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      display: none;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎯 ReactFlow Sample Generator</h1>
+    <p>Click button below to create sample document with 6 flow diagrams</p>
+    <button onclick="createSample()">🚀 Generate Sample</button>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    async function createSample() {
+      const btn = document.querySelector('button');
+      const msg = document.getElementById('message');
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Creating...';
+
+      try {
+        const db = await new Promise((resolve, reject) => {
+          const req = indexedDB.open('chorack-editor', 1);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('documents')) {
+              db.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains('nodes')) {
+              const s = db.createObjectStore('nodes', { keyPath: 'id', autoIncrement: true });
+              s.createIndex('documentId', 'documentId', { unique: false });
+              s.createIndex('flowId', 'flowId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('edges')) {
+              const s = db.createObjectStore('edges', { keyPath: 'id', autoIncrement: true });
+              s.createIndex('documentId', 'documentId', { unique: false });
+              s.createIndex('flowId', 'flowId', { unique: false });
+            }
+          };
+        });
+
+        // Clear
+        await new Promise((resolve) => {
+          const tx = db.transaction(['documents', 'nodes', 'edges'], 'readwrite');
+          tx.objectStore('documents').clear();
+          tx.objectStore('nodes').clear();
+          tx.objectStore('edges').clear();
+          tx.oncomplete = () => resolve();
+        });
+
+        // Create doc
+        const docId = await new Promise((resolve, reject) => {
+          const tx = db.transaction('documents', 'readwrite');
+          const req = tx.objectStore('documents').add({
+            title: '🎯 ReactFlow Demo - Inline Layout & Scaling',
+            content: '<h1>ReactFlow Demo</h1><h2>Example 1: Two Diagrams Side by Side</h2><react-flow-node-view flow-id="demo-1" width="400" height="300"></react-flow-node-view><react-flow-node-view flow-id="demo-2" width="400" height="300"></react-flow-node-view><h2>Example 2: Large Diagram</h2><react-flow-node-view flow-id="demo-3" width="800" height="400"></react-flow-node-view><h2>Example 3: Three Small Diagrams</h2><react-flow-node-view flow-id="demo-4" width="300" height="250"></react-flow-node-view><react-flow-node-view flow-id="demo-5" width="300" height="250"></react-flow-node-view><react-flow-node-view flow-id="demo-6" width="300" height="250"></react-flow-node-view>',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+
+        // Create flows
+        for (let i = 1; i <= 6; i++) {
+          const flowId = `demo-${i}`;
+          // Add 3 nodes
+          await new Promise((resolve) => {
+            const tx = db.transaction('nodes', 'readwrite');
+            tx.objectStore('nodes').add({ documentId: docId, flowId, nodeId: '1', type: 'input', data: { label: 'Start' }, position: { x: 50, y: 50 } });
+            tx.objectStore('nodes').add({ documentId: docId, flowId, nodeId: '2', type: 'default', data: { label: 'Process' }, position: { x: 150, y: 50 } });
+            tx.objectStore('nodes').add({ documentId: docId, flowId, nodeId: '3', type: 'output', data: { label: 'End' }, position: { x: 250, y: 50 } });
+            tx.oncomplete = () => resolve();
+          });
+          // Add 2 edges
+          await new Promise((resolve) => {
+            const tx = db.transaction('edges', 'readwrite');
+            tx.objectStore('edges').add({ documentId: docId, flowId, edgeId: 'e1', source: '1', target: '2', data: {} });
+            tx.objectStore('edges').add({ documentId: docId, flowId, edgeId: 'e2', source: '2', target: '3', data: {} });
+            tx.oncomplete = () => resolve();
+          });
+        }
+
+        msg.className = 'success';
+        msg.style.display = 'block';
+        msg.innerHTML = `
+          <h3>✅ Success!</h3>
+          <p><strong>What's next:</strong></p>
+          <ol style="text-align: left; display: inline-block;">
+            <li>Go to <a href="http://localhost:5173" target="_blank" style="color: #1976D2;">http://localhost:5173</a></li>
+            <li>Refresh page (F5)</li>
+            <li>Click "🎯 ReactFlow Demo" document</li>
+            <li>You should see 6 flow diagrams!</li>
+          </ol>
+        `;
+        btn.textContent = '✅ Done!';
+
+      } catch (error) {
+        msg.className = 'error';
+        msg.style.display = 'block';
+        msg.innerHTML = `<p>❌ Error: ${error.message}</p><p>Make sure pnpm dev is running</p>`;
+        btn.disabled = false;
+        btn.textContent = '🚀 Try Again';
+      }
+    }
+  </script>
+</body>
+</html>
