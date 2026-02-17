@@ -146,12 +146,15 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
               </p>
             </div>
           </div>
-          <button
+          <Button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            variant="ghost"
+            size="sm"
+            isSquared
+            className="!p-2"
           >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          </button>
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
         {/* Form */}

@@ -943,3 +943,31 @@
     box-shadow: var(--shadow-rose-md);
   }
 }
+
+/* ============================================
+   REACTFLOW OVERRIDES - Transparent node backgrounds
+   ============================================ */
+
+/* Make all ReactFlow nodes transparent by default */
+.react-flow__node {
+  background-color: transparent !important;
+}
+
+/* Specific override for entity nodes */
+.react-flow__node-entity {
+  background-color: transparent !important;
+}
+
+/* Ensure node wrapper is also transparent */
+.react-flow__node > div {
+  background-color: transparent !important;
+}
+
+/* Dark mode node backgrounds */
+.dark .react-flow__node {
+  background-color: transparent !important;
+}
+
+.dark .react-flow__node-entity {
+  background-color: transparent !important;
+}

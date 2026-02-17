@@ -21,16 +21,31 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
   const [editedLabel, setEditedLabel] = useState(data.label);
   const [editedAttributes, setEditedAttributes] = useState(data.attributes);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const { setNodes, getNodes } = useReactFlow();
 
   const hasPrimaryKey = data.attributes.some((attr) => attr.isPrimaryKey);
-  const bgColor = (data as any).backgroundColor || '#ffffff';
+
+  // Get node color from style
+  const node = getNodes().find(n => n.id === id);
+  const bgColor = (node?.style as any)?.backgroundColor || '#ffffff';
 
   // Determine if we're in dark mode
   const isDarkMode = document.documentElement.classList.contains('dark');
+
+  // Color palette
+  const COLOR_PALETTE = [
+    { name: 'Yellow', value: '#fef3c7' },
+    { name: 'Red', value: '#fecaca' },
+    { name: 'Teal', value: '#99f6e4' },
+    { name: 'White', value: '#ffffff' },
+    { name: 'Blue', value: '#bfdbfe' },
+    { name: 'Green', value: '#bbf7d0' },
+    { name: 'Purple', value: '#e9d5ff' },
+    { name: 'Pink', value: '#fbcfe8' },
+  ];
 
   // Helper to create solid color by mixing with white/black
   const createSolidColor = (hex: string, intensity: number) => {
@@ -61,23 +76,13 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
   // Determine if using a non-white color
   const isColored = bgColor.toLowerCase() !== '#ffffff';
 
-  // Generate solid color variations (no transparency to prevent mixing)
-  // Make colors VERY prominent and obvious
-  const headerBgColor = isColored
-    ? createSolidColor(bgColor, 0.85)  // 85% color - very strong!
-    : (isDarkMode ? 'rgb(51, 65, 85)' : 'rgb(248, 250, 252)');
+  // Calculate colors based on selection
+  const headerBgColor = isColored ? createSolidColor(bgColor, 0.5) : 'transparent';
+  const rowBgColor = isColored ? createSolidColor(bgColor, 0.25) : 'transparent';
+  const rowHoverBgColor = isColored ? createSolidColor(bgColor, 0.35) : 'rgba(0, 0, 0, 0.03)';
 
-  const rowBgColor = isColored
-    ? createSolidColor(bgColor, 0.4)  // 40% color - much more visible!
-    : 'transparent';
-
-  const rowHoverBgColor = isColored
-    ? createSolidColor(bgColor, 0.5)  // 50% color - very visible on hover
-    : (isDarkMode ? 'rgb(51, 65, 85)' : 'rgb(248, 250, 252)');
-
-  const borderColor = isColored
-    ? createSolidColor(bgColor, 0.6)  // 60% color - strong border
-    : (isDarkMode ? 'rgb(71, 85, 105)' : 'rgb(226, 232, 240)');
+  // Border remains visible for node definition
+  const borderColor = isDarkMode ? 'rgb(71, 85, 105)' : 'rgb(226, 232, 240)';
 
   // Handle inline name editing
   const handleNameDoubleClick = () => {
@@ -139,6 +144,19 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
+  // Handle color change
+  const handleColorChange = (color: string) => {
+    setNodes((nodes: Node[]) =>
+      nodes.map((node) =>
+        node.id === id
+          ? { ...node, style: { ...node.style, backgroundColor: color } }
+          : node
+      )
+    );
+    setShowColorPicker(false);
+    setContextMenu(null);
+  };
+
   const handleContextMenuAction = (action: 'edit' | 'duplicate' | 'delete') => {
     const node = getNodes().find((n) => n.id === id);
     if (!node) return;
@@ -168,9 +186,7 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
       <div
         className="entity-node group relative transition-all duration-200"
         style={{
-          backgroundColor: isColored
-            ? createSolidColor(bgColor, 0.35)  // 35% color - prominent background!
-            : (isDarkMode ? 'rgb(30, 41, 59)' : 'rgba(255, 255, 255, 0.95)'),
+          backgroundColor: 'transparent',
           borderRadius: '12px',
           minWidth: '240px',
           maxWidth: '320px',
@@ -196,7 +212,8 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
             onClick={(e) => {
               e.stopPropagation();
               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setContextMenu({ x: rect.left, y: rect.bottom + 4 });
+              // Position menu to the right of the button, vertically centered
+              setContextMenu({ x: rect.right + 8, y: rect.top + rect.height / 2 - 10 });
             }}
             className="absolute top-3 right-3 z-10 w-7 h-7 rounded-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-200 shadow-sm border border-slate-200 dark:border-slate-700"
             style={{ opacity: isHovered ? '1' : '0' }}
@@ -228,11 +245,7 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{
-                backgroundColor: hasPrimaryKey
-                  ? createSolidColor('#6366f1', 0.4)
-                  : (isColored
-                      ? createSolidColor(bgColor, 0.6)  // 60% color - prominent icon!
-                      : (isDarkMode ? 'rgb(71, 85, 105)' : 'rgb(226, 232, 240)')),
+                backgroundColor: headerBgColor,
               }}
             >
               {hasPrimaryKey ? (
@@ -436,10 +449,13 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
         <>
           <div
             className="fixed inset-0 z-40"
-            onClick={() => setContextMenu(null)}
+            onClick={() => {
+              setContextMenu(null);
+              setShowColorPicker(false);
+            }}
           />
           <div
-            className="fixed z-50 w-52 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-scale-in"
+            className="fixed z-50 w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-scale-in"
             style={{
               left: `${contextMenu.x}px`,
               top: `${contextMenu.y}px`,
@@ -464,54 +480,43 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
               Duplicate
             </button>
 
-            {/* Color Picker Submenu */}
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowColorPicker(!showColorPicker);
-                }}
-                className="w-full px-4 py-2.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors"
-              >
+            {/* Color Picker Section */}
+            <div className="h-px bg-slate-200 dark:bg-slate-700 my-1 mx-2" />
+            <button
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              className="w-full px-4 py-2.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              <span className="flex items-center gap-3">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                 </svg>
-                Change Color
-                <svg className={`w-3 h-3 ml-auto transition-transform ${showColorPicker ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {showColorPicker && (
-                <div className="absolute left-full top-0 ml-1 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 z-50">
-                  <div className="grid grid-cols-6 gap-2">
-                    {['#ffffff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24', '#f59e0b', '#d97706', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#fecaca', '#fca5a5', '#f87171', '#ef4444'].map((color) => (
-                      <button
-                        key={color}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setNodes((nodes: Node[]) =>
-                            nodes.map((node) =>
-                              node.id === id
-                                ? { ...node, style: { ...node.style, backgroundColor: color } }
-                                : node
-                            )
-                          );
-                          setShowColorPicker(false);
-                          setContextMenu(null);
-                        }}
-                        className="w-8 h-8 rounded-lg border-2 hover:scale-110 transition-all duration-200 hover:border-slate-400"
-                        style={{
-                          backgroundColor: color,
-                          borderColor: color === '#ffffff' ? '#e2e8f0' : color,
-                        }}
-                        title={color}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+                Color
+              </span>
+              <svg
+                className={`w-4 h-4 transition-transform ${showColorPicker ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showColorPicker && (
+              <div className="px-3 pb-2 grid grid-cols-4 gap-2">
+                {COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => handleColorChange(color.value)}
+                    className="w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{
+                      backgroundColor: color.value,
+                      borderColor: bgColor.toLowerCase() === color.value.toLowerCase() ? 'rgb(99, 102, 241)' : 'rgb(226, 232, 240)',
+                    }}
+                    title={color.name}
+                  />
+                ))}
+              </div>
+            )}
 
             <div className="h-px bg-slate-200 dark:bg-slate-700 my-1 mx-2" />
             <button

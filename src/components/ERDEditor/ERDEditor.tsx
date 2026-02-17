@@ -1,12 +1,12 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
-  Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -14,13 +14,17 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { EntityNode } from '../../components/TiptapEditor/nodes/EntityNode';
-import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Edit3, Link2, Code2 } from 'lucide-react';
+import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Edit3, Code2, ZoomIn, ZoomOut, Monitor } from 'lucide-react';
 import { EntityFormModal, type EntityFormData } from './EntityFormModal';
 import type { EdgeType } from './EdgeTypeSelector';
 import { Button } from '../../components/ui/Button';
 import { Tooltip } from '../../components/ui/Tooltip';
 import { CustomEdge } from './CustomEdge';
 import { YAMLEditorPanel } from '../../components/YAMLEditorPanel';
+import { applyElkLayout, LayoutPresets } from '../../lib/elkLayout';
+import { getRelativeTime } from '../../lib/utils';
+import { useToast } from '../ui/Toast';
+import { formatChangeSummary, type DiagramChanges } from '@/lib/changeDetection';
 
 export interface Attribute {
   name: string;
@@ -44,8 +48,56 @@ const edgeTypes = {
   default: CustomEdge,
 };
 
+// Custom Zoom Controls component
+function CustomZoomControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  return (
+    <div className="absolute bottom-6 left-6 z-10 flex flex-col gap-2">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-2 flex flex-col gap-1">
+        <Tooltip content="Zoom in" placement="right">
+          <Button
+            onClick={() => zoomIn({ duration: 300 })}
+            variant="ghost"
+            size="sm"
+            className="!p-2 !w-9 !h-9"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+        </Tooltip>
+
+        <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
+
+        <Tooltip content="Zoom out" placement="right">
+          <Button
+            onClick={() => zoomOut({ duration: 300 })}
+            variant="ghost"
+            size="sm"
+            className="!p-2 !w-9 !h-9"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+        </Tooltip>
+
+        <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
+
+        <Tooltip content="Fit all nodes in view" placement="right">
+          <Button
+            onClick={() => fitView({ duration: 300, padding: 0.2 })}
+            variant="ghost"
+            size="sm"
+            className="!p-2 !w-9 !h-9"
+          >
+            <Monitor className="w-4 h-4" />
+          </Button>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
 interface ERDEditorProps {
-  onSave?: (data: { nodes: Node[]; edges: Edge[] }) => void;
+  onSave?: (data: { nodes: Node[]; edges: Edge[] }, isAutoSave?: boolean) => void | Promise<void>;
   initialNodes?: Node[];
   initialEdges?: Edge[];
 }
@@ -56,11 +108,17 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
   const [pendingNodePosition, setPendingNodePosition] = useState<{ x: number; y: number } | null>(null);
   const [editingNodeData, setEditingNodeData] = useState<EntityFormData | null>(null);
-  const [selectedEdgeType, setSelectedEdgeType] = useState<EdgeType>('1:N');
+  const [selectedEdgeType] = useState<EdgeType>('1:N');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [connectionMode, setConnectionMode] = useState<{ sourceId: string | null }>({ sourceId: null });
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [isYamlPanelOpen, setIsYamlPanelOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<keyof typeof LayoutPresets>('hierarchical');
+  const [isLayouting, setIsLayouting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toast = useToast();
 
   // Handle custom events from CustomEdge component
   useEffect(() => {
@@ -139,47 +197,14 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
     };
   }, [setEdges]);
 
-  // Handle canvas click - deselect and cancel connection mode
+  // Handle canvas click - deselect nodes
   const onPaneClick = useCallback((event: React.MouseEvent) => {
-    // Cancel connection mode if active
-    if (connectionMode.sourceId) {
-      setConnectionMode({ sourceId: null });
-      return;
-    }
-
     // Deselect nodes when clicking on canvas
     if (event.target === event.currentTarget) {
       setSelectedNodeId(null);
     }
-  }, [connectionMode.sourceId]);
-
-  // Handle connection mode - click to select source, then click target
-  const handleConnectFromEntity = useCallback((entityId: string) => {
-    if (!connectionMode.sourceId) {
-      // First click - select as source
-      setConnectionMode({ sourceId: entityId });
-    } else if (connectionMode.sourceId === entityId) {
-      // Clicked same entity - cancel
-      setConnectionMode({ sourceId: null });
-    } else {
-      // Second click - create connection
-      const edge = {
-        id: `edge-${Date.now()}`,
-        source: connectionMode.sourceId,
-        target: entityId,
-        type: 'custom',
-        label: selectedEdgeType,
-        data: { label: selectedEdgeType },
-        style: { stroke: '#8b5cf6', strokeWidth: 2 },
-      };
-      setEdges((eds) => [...eds, edge]);
-      setConnectionMode({ sourceId: null });
-    }
-  }, [connectionMode.sourceId, selectedEdgeType, setEdges]);
-
-  const cancelConnectionMode = useCallback(() => {
-    setConnectionMode({ sourceId: null });
   }, []);
+
 
   // Handle entity form submission
   const handleEntitySubmit = useCallback((data: EntityFormData & { color?: string }) => {
@@ -248,15 +273,9 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   );
 
   // Handle node selection
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    // Check if we're in connection mode
-    if (connectionMode.sourceId) {
-      event.stopPropagation();
-      handleConnectFromEntity(node.id);
-    } else {
-      setSelectedNodeId(node.id);
-    }
-  }, [connectionMode.sourceId, handleConnectFromEntity]);
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
 
   // Delete selected nodes/edges
   const onDelete = useCallback(() => {
@@ -309,36 +328,27 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
     input.click();
   }, [setNodes, setEdges]);
 
-  // Save diagram
+  // Save diagram (manual save)
   const handleSave = useCallback(() => {
     if (onSave) {
-      onSave({ nodes, edges });
+      onSave({ nodes, edges }, false); // false = manual save
     }
   }, [nodes, edges, onSave]);
 
-  // Auto layout (simple grid layout)
-  const autoLayout = useCallback(() => {
+  // Auto layout using ELK
+  const autoLayout = useCallback(async () => {
     if (nodes.length === 0) return;
-
-    const columns = Math.ceil(Math.sqrt(nodes.length));
-    const nodeWidth = 250;
-    const nodeHeight = 200;
-    const gap = 50;
-
-    setNodes((nds) =>
-      nds.map((node, index) => {
-        const row = Math.floor(index / columns);
-        const col = index % columns;
-        return {
-          ...node,
-          position: {
-            x: col * (nodeWidth + gap) + 50,
-            y: row * (nodeHeight + gap) + 50,
-          },
-        };
-      })
-    );
-  }, [nodes, setNodes]);
+    
+    setIsLayouting(true);
+    try {
+      const { nodes: layoutedNodes } = await applyElkLayout(nodes, edges, LayoutPresets[selectedPreset]);
+      setNodes(layoutedNodes);
+    } catch (error) {
+      console.error('Layout failed:', error);
+    } finally {
+      setIsLayouting(false);
+    }
+  }, [nodes, edges, selectedPreset, setNodes]);
 
   // Open entity modal at center or default position
   const handleAddEntity = useCallback(() => {
@@ -347,10 +357,50 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   }, []);
 
   // Handle diagram changes from YAML editor
-  const handleDiagramChange = useCallback((newNodes: Node[], newEdges: Edge[]) => {
+  const handleDiagramChange = useCallback((newNodes: Node[], newEdges: Edge[], changes?: DiagramChanges) => {
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [setNodes, setEdges]);
+
+    // Show toast notification if changes were detected
+    if (changes && (changes.nodes.length > 0 || changes.edges.length > 0)) {
+      const summary = formatChangeSummary(changes);
+      toast.success(`YAML changes applied: ${summary}`, 4000);
+    }
+  }, [setNodes, setEdges, toast]);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    if (!onSave) return; // Only auto-save if onSave is provided
+    
+    // Clear any existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Mark as having unsaved changes
+    setHasUnsavedChanges(true);
+
+    // Set up auto-save after 2 seconds of no changes
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        await onSave({ nodes, edges }, true); // true = auto-save
+        setHasUnsavedChanges(false);
+        setLastSavedAt(new Date());
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 2000);
+
+    // Cleanup on unmount
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [nodes, edges, onSave]);
 
   // MiniMap node color
   const nodeColor = useCallback((node: Node) => {
@@ -361,7 +411,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   }, []);
 
   return (
-    <div className="w-full h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="w-full h-full flex flex-col bg-slate-50 dark:bg-slate-900">
       {/* Toolbar */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-3 shadow-sm">
         {/* Top Row - Branding and Main Actions */}
@@ -377,6 +427,33 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Save Status Indicator */}
+            <div className="flex items-center gap-2 text-xs">
+              {isSaving && (
+                <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                  <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="font-medium">Saving...</span>
+                </div>
+              )}
+              {!isSaving && hasUnsavedChanges && (
+                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                  <span className="font-medium">Unsaved changes</span>
+                </div>
+              )}
+              {!isSaving && !hasUnsavedChanges && lastSavedAt && (
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Saved {lastSavedAt ? getRelativeTime(lastSavedAt) : 'just now'}</span>
+                </div>
+              )}
+            </div>
+
             <Tooltip content="Save diagram" placement="bottom">
               <Button
                 onClick={handleSave}
@@ -426,7 +503,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-700">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">Entities</span>
 
-            <Tooltip content="Add Entity" placement="bottom">
+            <Tooltip content="Add a new entity/table to the diagram" placement="bottom">
               <Button
                 onClick={handleAddEntity}
                 variant="secondary"
@@ -437,87 +514,34 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
               </Button>
             </Tooltip>
 
-            <Tooltip content="Auto Layout" placement="bottom">
+            <Tooltip content="Apply automatic layout to arrange entities" placement="bottom">
               <Button
                 onClick={autoLayout}
                 variant="outline"
                 size="sm"
                 leftIcon={<Maximize className="w-4 h-4" />}
+                disabled={isLayouting}
               >
-                <span className="hidden lg:inline">Layout</span>
-              </Button>
-            </Tooltip>
-          </div>
-
-          {/* Connection Mode */}
-          <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-700">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">Connect</span>
-            
-            <Tooltip content="Click two entities to connect them" placement="bottom">
-              <Button
-                onClick={() => {
-                  if (connectionMode.sourceId) {
-                    cancelConnectionMode();
-                  } else {
-                    setConnectionMode({ sourceId: null });
-                  }
-                }}
-                variant={connectionMode.sourceId ? 'primary' : 'outline'}
-                size="sm"
-                leftIcon={<Link2 className="w-4 h-4" />}
-                className={connectionMode.sourceId ? 'animate-pulse' : ''}
-              >
-                <span className="hidden lg:inline">
-                  {connectionMode.sourceId ? 'Cancel Connect' : 'Connect Mode'}
-                </span>
+                <span className="hidden lg:inline">{isLayouting ? 'Layouting...' : 'Layout'}</span>
               </Button>
             </Tooltip>
 
-            {connectionMode.sourceId && (
-              <div className="px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-semibold flex items-center gap-2 border border-indigo-200 dark:border-indigo-800">
-                <svg className="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-                Select target entity
+            <Tooltip content="Choose layout algorithm for automatic arrangement" placement="bottom">
+              <div className="relative">
+                <select
+                  value={selectedPreset}
+                  onChange={(e) => setSelectedPreset(e.target.value as keyof typeof LayoutPresets)}
+                  className="px-3 py-1.5 pr-8 text-sm rounded-xl border border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800"
+                >
+                  <option value="hierarchical">Hierarchical</option>
+                  <option value="topDown">Top Down</option>
+                  <option value="compact">Compact</option>
+                  <option value="spacious">Spacious</option>
+                  <option value="force">Force</option>
+                  <option value="radial">Radial</option>
+                </select>
               </div>
-            )}
-          </div>
-
-          {/* Relationship Tools */}
-          <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-700">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">Relationships</span>
-
-            <Button
-              variant={selectedEdgeType === '1:1' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedEdgeType('1:1')}
-            >
-              1:1
-            </Button>
-
-            <Button
-              variant={selectedEdgeType === '1:N' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedEdgeType('1:N')}
-            >
-              1:N
-            </Button>
-
-            <Button
-              variant={selectedEdgeType === 'N:1' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedEdgeType('N:1')}
-            >
-              N:1
-            </Button>
-
-            <Button
-              variant={selectedEdgeType === 'N:M' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedEdgeType('N:M')}
-            >
-              N:M
-            </Button>
+            </Tooltip>
           </div>
 
           {/* Edit Tools */}
@@ -604,32 +628,12 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           connectionLineType={ConnectionLineType.SmoothStep}
         >
           <Background />
-          <Controls />
+
+          {/* Custom Zoom Controls */}
+          <CustomZoomControls />
+
           <MiniMap nodeColor={nodeColor} />
         </ReactFlow>
-
-        {/* Connection Mode Helper Overlay */}
-        {connectionMode.sourceId && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 animate-fade-in">
-            <div className="bg-gradient-to-r from-indigo-500 to-violet-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Connection Mode Active</p>
-                <p className="text-xs text-indigo-100">Click another entity to create a relationship</p>
-              </div>
-              <button
-                onClick={cancelConnectionMode}
-                className="ml-2 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-semibold transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Entity Form Modal */}

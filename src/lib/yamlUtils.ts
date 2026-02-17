@@ -123,10 +123,6 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
       const x = col * (nodeWidth + gap) + 50;
       const y = row * (nodeHeight + gap) + 50;
 
-      // Get color
-      const modelColor = model.color || data.colors?.default || 'white';
-      const backgroundColor = COLOR_MAP[modelColor] || modelColor;
-
       // Convert fields to attributes
       const attributes = Object.entries(model.fields || {}).map(([fieldName, field]) => ({
         name: fieldName,
@@ -144,9 +140,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
           label: model.table_name || modelName,
           attributes,
         },
-        style: {
-          backgroundColor,
-        },
+        // No background color - nodes will use neutral colors
       };
 
       nodes.push(node);

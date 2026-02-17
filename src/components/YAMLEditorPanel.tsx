@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { X, Code2, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { diagramToYaml, yamlToDiagram, generateDefaultYAML } from '@/lib/yamlUtils';
+import { detectChanges, type DiagramChanges } from '@/lib/changeDetection';
 import type { Node, Edge } from 'reactflow';
 import type { EntityNodeData } from '../components/TiptapEditor/nodes/EntityNode';
 
@@ -11,7 +12,7 @@ interface YAMLEditorPanelProps {
   onClose: () => void;
   nodes: Node<EntityNodeData>[];
   edges: Edge[];
-  onDiagramChange: (nodes: Node[], edges: Edge[]) => void;
+  onDiagramChange: (nodes: Node[], edges: Edge[], changes?: DiagramChanges) => void;
 }
 
 export function YAMLEditorPanel({
@@ -28,10 +29,16 @@ export function YAMLEditorPanel({
   const [isApplying, setIsApplying] = useState(false);
   const [isUserEditing, setIsUserEditing] = useState(false);
   const editorRef = useRef<any>(null);
+  const originalNodesRef = useRef<Node[]>([]);
+  const originalEdgesRef = useRef<Edge[]>([]);
 
   // Initialize YAML from current diagram when panel opens
   useEffect(() => {
     if (isOpen) {
+      // Store original nodes/edges for change detection
+      originalNodesRef.current = [...nodes];
+      originalEdgesRef.current = [...edges];
+
       if (nodes.length > 0) {
         const yaml = diagramToYaml(nodes, edges);
         setYamlCode(yaml);
@@ -82,7 +89,21 @@ export function YAMLEditorPanel({
     setIsApplying(true);
     try {
       const { nodes: newNodes, edges: newEdges } = yamlToDiagram(yamlCode);
-      onDiagramChange(newNodes, newEdges);
+
+      // Detect changes
+      const changes = detectChanges(
+        originalNodesRef.current,
+        originalEdgesRef.current,
+        newNodes,
+        newEdges
+      );
+
+      onDiagramChange(newNodes, newEdges, changes);
+
+      // Update original refs to new state
+      originalNodesRef.current = newNodes;
+      originalEdgesRef.current = newEdges;
+
       setHasChanges(false);
       setIsUserEditing(false);
       setIsValid(true);
