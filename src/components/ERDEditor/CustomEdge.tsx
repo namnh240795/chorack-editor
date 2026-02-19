@@ -162,21 +162,10 @@ export const CustomEdge = memo(
       e.preventDefault();
       setIsDraggingLabel(true);
 
-      let hasMoved = false;
-      const startX = e.clientX;
-      const startY = e.clientY;
+      // Don't update position on click - wait for actual drag movement
+      let isDragging = false;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        // Only start updating after the mouse has moved significantly
-        const dx = moveEvent.clientX - startX;
-        const dy = moveEvent.clientY - startY;
-        
-        if (!hasMoved && Math.sqrt(dx * dx + dy * dy) < 5) {
-          return; // Don't update if moved less than 5 pixels
-        }
-        
-        hasMoved = true;
-        
         const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
         if (!reactFlowWrapper) return;
 
@@ -282,10 +271,13 @@ export const CustomEdge = memo(
           }
         }
 
-        const updateEvent = new CustomEvent('update-edge-label-position', {
-          detail: { edgeId: id, x: constrainedX, y: constrainedY }
-        });
-        window.dispatchEvent(updateEvent);
+        // Only update if we're actually dragging (moved after initial click)
+        if (isDragging) {
+          const updateEvent = new CustomEvent('update-edge-label-position', {
+            detail: { edgeId: id, x: constrainedX, y: constrainedY }
+          });
+          window.dispatchEvent(updateEvent);
+        }
       };
 
       const handleMouseUp = () => {
@@ -294,9 +286,16 @@ export const CustomEdge = memo(
         document.removeEventListener('mouseup', handleMouseUp);
       };
 
+      // Mark as dragging after a short delay to skip the initial click
+      setTimeout(() => {
+        if (isDraggingLabel) {
+          isDragging = true;
+        }
+      }, 100);
+
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-    }, [id, selected, getViewport, sourceX, sourceY, targetX, targetY, edgeStyleType, controlPoint]);
+    }, [id, selected, getViewport, sourceX, sourceY, targetX, targetY, edgeStyleType, controlPoint, isDraggingLabel]);
 
     return (
       <>
