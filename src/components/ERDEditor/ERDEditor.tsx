@@ -664,6 +664,10 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
         }}
         onSubmit={handleEntitySubmit}
         initialData={editingNodeData || undefined}
+        currentNodeId={editingNodeId || undefined}
+        allNodes={nodes}
+        allEdges={edges}
+        onEdgesChange={setEdges}
       />
 
       {/* YAML Editor Panel */}
