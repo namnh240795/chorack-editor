@@ -173,67 +173,100 @@ export const CustomEdge = memo(
         const mouseX = (moveEvent.clientX - reactFlowBounds.left - viewport.x) / viewport.zoom;
         const mouseY = (moveEvent.clientY - reactFlowBounds.top - viewport.y) / viewport.zoom;
 
-        // Find the closest point on the edge path
+        // Calculate position along edge (0 to 1) based on mouse position
+        let t = 0.5; // Default to middle
         let constrainedX = mouseX;
         let constrainedY = mouseY;
 
         if (edgeStyleType === 'straight') {
-          // Project onto the line segment
+          // For straight lines, use projection
           const dx = targetX - sourceX;
           const dy = targetY - sourceY;
           const lengthSq = dx * dx + dy * dy;
           if (lengthSq > 0) {
-            const t = ((mouseX - sourceX) * dx + (mouseY - sourceY) * dy) / lengthSq;
-            const clampedT = Math.max(0, Math.min(1, t));
-            constrainedX = sourceX + clampedT * dx;
-            constrainedY = sourceY + clampedT * dy;
-          }
-        } else if (edgeStyleType === 'orthogonal') {
-          // Orthogonal path: horizontal -> vertical -> horizontal
-          const midX = (sourceX + targetX) / 2;
-          
-          // Determine which segment the mouse is closest to
-          const dTopHoriz = Math.abs(mouseY - sourceY) + (mouseX < Math.min(sourceX, targetX) || mouseX > Math.max(sourceX, targetX) ? 1000 : 0);
-          const dBottomHoriz = Math.abs(mouseY - targetY) + (mouseX < Math.min(sourceX, targetX) || mouseX > Math.max(sourceX, targetX) ? 1000 : 0);
-          const dVert = Math.abs(mouseX - midX) + (mouseY < Math.min(sourceY, targetY) || mouseY > Math.max(sourceY, targetY) ? 1000 : 0);
-          
-          const minD = Math.min(dTopHoriz, dBottomHoriz, dVert);
-          
-          if (minD === dTopHoriz) {
-            constrainedX = Math.max(Math.min(sourceX, targetX), Math.min(Math.max(sourceX, targetX), mouseX));
-            constrainedY = sourceY;
-          } else if (minD === dBottomHoriz) {
-            constrainedX = Math.max(Math.min(sourceX, targetX), Math.min(Math.max(sourceX, targetX), mouseX));
-            constrainedY = targetY;
-          } else {
-            constrainedX = midX;
-            constrainedY = Math.max(Math.min(sourceY, targetY), Math.min(Math.max(sourceY, targetY), mouseY));
+            t = ((mouseX - sourceX) * dx + (mouseY - sourceY) * dy) / lengthSq;
+            t = Math.max(0, Math.min(1, t));
+            constrainedX = sourceX + t * dx;
+            constrainedY = sourceY + t * dy;
           }
         } else {
-          // Smoothstep: project onto one of the segments
-          const midX = controlPoint.x;
+          // For orthogonal and smoothstep, use the dominant axis
+          const dx = Math.abs(targetX - sourceX);
+          const dy = Math.abs(targetY - sourceY);
           
-          // Calculate distances to each segment
-          // Segment 1: horizontal at sourceY, from sourceX to midX
-          const d1 = Math.abs(mouseY - sourceY) + (mouseX < Math.min(sourceX, midX) || mouseX > Math.max(sourceX, midX) ? 1000 : 0);
-          
-          // Segment 2: vertical at midX, from sourceY to targetY
-          const d2 = Math.abs(mouseX - midX) + (mouseY < Math.min(sourceY, targetY) || mouseY > Math.max(sourceY, targetY) ? 1000 : 0);
-          
-          // Segment 3: horizontal at targetY, from midX to targetX
-          const d3 = Math.abs(mouseY - targetY) + (mouseX < Math.min(midX, targetX) || mouseX > Math.max(midX, targetX) ? 1000 : 0);
-          
-          const minD = Math.min(d1, d2, d3);
-          
-          if (minD === d1) {
-            constrainedX = Math.max(Math.min(sourceX, midX), Math.min(Math.max(sourceX, midX), mouseX));
-            constrainedY = sourceY;
-          } else if (minD === d2) {
-            constrainedX = midX;
-            constrainedY = Math.max(Math.min(sourceY, targetY), Math.min(Math.max(sourceY, targetY), mouseY));
+          if (dx > dy) {
+            // Horizontal edge dominant - use X position
+            t = (mouseX - Math.min(sourceX, targetX)) / dx;
+            t = Math.max(0, Math.min(1, t));
+            
+            // Interpolate position along edge
+            if (edgeStyleType === 'orthogonal') {
+              const midX = (sourceX + targetX) / 2;
+              if (t < 0.5) {
+                // First horizontal segment
+                const segT = t * 2;
+                constrainedX = sourceX + (midX - sourceX) * segT;
+                constrainedY = sourceY;
+              } else {
+                // Second horizontal segment
+                const segT = (t - 0.5) * 2;
+                constrainedX = midX + (targetX - midX) * segT;
+                constrainedY = targetY;
+              }
+            } else {
+              // Smoothstep
+              const midX = controlPoint.x;
+              if (t < 0.33) {
+                // First horizontal segment
+                const segT = t * 3;
+                constrainedX = sourceX + (midX - sourceX) * segT;
+                constrainedY = sourceY;
+              } else if (t < 0.66) {
+                // Vertical segment
+                const segT = (t - 0.33) * 3;
+                constrainedX = midX;
+                constrainedY = sourceY + (targetY - sourceY) * segT;
+              } else {
+                // Last horizontal segment
+                const segT = (t - 0.66) * 3;
+                constrainedX = midX + (targetX - midX) * segT;
+                constrainedY = targetY;
+              }
+            }
           } else {
-            constrainedX = Math.max(Math.min(midX, targetX), Math.min(Math.max(midX, targetX), mouseX));
-            constrainedY = targetY;
+            // Vertical edge dominant - use Y position
+            t = (mouseY - Math.min(sourceY, targetY)) / dy;
+            t = Math.max(0, Math.min(1, t));
+            
+            // Interpolate position along edge
+            if (edgeStyleType === 'orthogonal') {
+              const midY = (sourceY + targetY) / 2;
+              if (t < 0.5) {
+                // First vertical segment
+                const segT = t * 2;
+                constrainedX = sourceX;
+                constrainedY = sourceY + (midY - sourceY) * segT;
+              } else {
+                // Second vertical segment
+                const segT = (t - 0.5) * 2;
+                constrainedX = targetX;
+                constrainedY = midY + (targetY - midY) * segT;
+              }
+            } else {
+              // Smoothstep - approximate
+              const cpX = controlPoint.x;
+              const cpY = controlPoint.y;
+              if (t < 0.33) {
+                constrainedX = sourceX;
+                constrainedY = sourceY + (cpY - sourceY) * (t * 3);
+              } else if (t < 0.66) {
+                constrainedX = cpX;
+                constrainedY = cpY + (targetY - cpY) * ((t - 0.33) * 3);
+              } else {
+                constrainedX = cpX;
+                constrainedY = targetY;
+              }
+            }
           }
         }
 
