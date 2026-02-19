@@ -1,10 +1,11 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef } from 'react';
 import type { EdgeProps } from 'reactflow';
 import {
   getMarkerEnd,
   EdgeLabelRenderer,
   BaseEdge,
   MarkerType,
+  useReactFlow,
 } from 'reactflow';
 import { cn } from '@/lib/utils';
 
@@ -45,8 +46,10 @@ const edgeTypeStyles: Record<EdgeType, { color: string; dashArray: string; strok
 
 export const CustomEdge = memo(
   ({ id, sourceX, sourceY, targetX, targetY, selected, data, style }: CustomEdgeProps) => {
+    const { getViewport } = useReactFlow();
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [isDraggingLabel, setIsDraggingLabel] = useState(false);
+    const isDraggingControlPoint = useRef(false);
 
     const edgeType = (data?.label as EdgeType) || '1:N';
     const edgeStyleType = data?.edgeStyle || 'smoothstep';
@@ -123,54 +126,68 @@ export const CustomEdge = memo(
     const handleControlPointMouseDown = useCallback((e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
+      isDraggingControlPoint.current = true;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        const reactFlowBounds = (document.querySelector('.react-flow') as HTMLElement).getBoundingClientRect();
-        const x = moveEvent.clientX - reactFlowBounds.left;
-        const y = moveEvent.clientY - reactFlowBounds.top;
+        const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
+        if (!reactFlowWrapper) return;
+
+        const reactFlowBounds = reactFlowWrapper.getBoundingClientRect();
+        const viewport = getViewport();
+
+        // Convert screen coordinates to flow coordinates (accounting for zoom and pan)
+        const flowX = (moveEvent.clientX - reactFlowBounds.left - viewport.x) / viewport.zoom;
+        const flowY = (moveEvent.clientY - reactFlowBounds.top - viewport.y) / viewport.zoom;
 
         const updateEvent = new CustomEvent('update-edge-control-point', {
-          detail: { edgeId: id, x, y }
+          detail: { edgeId: id, x: flowX, y: flowY }
         });
         window.dispatchEvent(updateEvent);
       };
 
       const handleMouseUp = () => {
+        isDraggingControlPoint.current = false;
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-    }, [id]);
+    }, [id, getViewport]);
 
     const handleLabelMouseDown = useCallback((e: React.MouseEvent) => {
       if (!selected) return; // Only allow dragging when edge is selected
-      
+
       e.stopPropagation();
       e.preventDefault();
       setIsDraggingLabel(true);
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        const reactFlowBounds = (document.querySelector('.react-flow') as HTMLElement).getBoundingClientRect();
-        const x = moveEvent.clientX - reactFlowBounds.left;
-        const y = moveEvent.clientY - reactFlowBounds.top;
+        const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
+        if (!reactFlowWrapper) return;
+
+        const reactFlowBounds = reactFlowWrapper.getBoundingClientRect();
+        const viewport = getViewport();
+
+        // Convert screen coordinates to flow coordinates (accounting for zoom and pan)
+        const flowX = (moveEvent.clientX - reactFlowBounds.left - viewport.x) / viewport.zoom;
+        const flowY = (moveEvent.clientY - reactFlowBounds.top - viewport.y) / viewport.zoom;
 
         const updateEvent = new CustomEvent('update-edge-label-position', {
-          detail: { edgeId: id, x, y }
+          detail: { edgeId: id, x: flowX, y: flowY }
         });
         window.dispatchEvent(updateEvent);
       };
 
       const handleMouseUp = () => {
+        setIsDraggingLabel(false);
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
-        setIsDraggingLabel(false);
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-    }, [id, selected]);
+    }, [id, selected, getViewport]);
 
     return (
       <>

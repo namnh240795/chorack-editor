@@ -170,14 +170,11 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
 
     const handleUpdateControlPoint = (e: Event) => {
       const detail = (e as CustomEvent).detail as { edgeId: string; x: number; y: number };
-      const reactFlowBounds = (document.querySelector('.react-flow') as HTMLElement).getBoundingClientRect();
-      const x = detail.x - reactFlowBounds.left;
-      const y = detail.y - reactFlowBounds.top;
-
+      // Coordinates are already transformed to flow coordinates in CustomEdge
       setEdges((eds) =>
         eds.map((edge) =>
           edge.id === detail.edgeId
-            ? { ...edge, data: { ...edge.data, controlPoint: { x, y } } }
+            ? { ...edge, data: { ...edge.data, controlPoint: { x: detail.x, y: detail.y } } }
             : edge
         )
       );
