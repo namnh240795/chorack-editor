@@ -162,7 +162,21 @@ export const CustomEdge = memo(
       e.preventDefault();
       setIsDraggingLabel(true);
 
+      let hasMoved = false;
+      const startX = e.clientX;
+      const startY = e.clientY;
+
       const handleMouseMove = (moveEvent: MouseEvent) => {
+        // Only start updating after the mouse has moved significantly
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        
+        if (!hasMoved && Math.sqrt(dx * dx + dy * dy) < 5) {
+          return; // Don't update if moved less than 5 pixels
+        }
+        
+        hasMoved = true;
+        
         const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
         if (!reactFlowWrapper) return;
 
