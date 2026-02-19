@@ -12,18 +12,25 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
   rightIcon?: ReactNode;
 }
 
+// Standard input sizes - consistent across all form components
+export const inputSizes = {
+  sm: 'px-3 py-1.5 text-sm h-[34px]',
+  md: 'px-4 py-2 text-base h-[42px]',
+  lg: 'px-5 py-3 text-lg h-[50px]',
+} as const;
+
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ 
-    className, 
-    error, 
-    label, 
+  ({
+    className,
+    error,
+    label,
     helperText,
     variant = 'default',
     size = 'md',
     leftIcon,
     rightIcon,
     id,
-    ...props 
+    ...props
   }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
@@ -33,30 +40,24 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       outlined: 'bg-transparent border-2 border-slate-300 dark:border-slate-600',
     };
 
-    const sizeStyles = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-base',
-      lg: 'px-5 py-3 text-lg',
-    };
-
     return (
       <div className="w-full">
         {label && (
-          <label 
-            htmlFor={inputId} 
+          <label
+            htmlFor={inputId}
             className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
           >
             {label}
           </label>
         )}
-        
+
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600 pointer-events-none">
               {leftIcon}
             </div>
           )}
-          
+
           <input
             ref={ref}
             id={inputId}
@@ -69,16 +70,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 ? 'border-rose-500 dark:border-rose-500 focus:ring-rose-500 focus:border-rose-500'
                 : 'hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 focus:ring-indigo-500',
               variantStyles[variant],
-              sizeStyles[size],
+              inputSizes[size],
               leftIcon && 'pl-10',
               rightIcon && 'pr-10',
               className
             )}
             {...props}
           />
-          
+
           {rightIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600 pointer-events-none">
               {rightIcon}
             </div>
           )}
@@ -87,7 +88,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {helperText && !error && (
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{helperText}</p>
         )}
-        
+
         {error && (
           <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">{error}</p>
         )}

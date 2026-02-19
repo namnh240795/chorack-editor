@@ -2,7 +2,6 @@ import { memo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps, useReactFlow } from 'reactflow';
 import type { Node } from 'reactflow';
-import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
 
 export interface Attribute {
   name: string;
@@ -10,6 +9,7 @@ export interface Attribute {
   isPrimaryKey: boolean;
   isForeignKey: boolean;
   isNullable: boolean;
+  isUnique: boolean;
 }
 
 export interface EntityNodeData {
@@ -18,17 +18,11 @@ export interface EntityNodeData {
 }
 
 export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData>) => {
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editingAttribute, setEditingAttribute] = useState<number | null>(null);
-  const [editedLabel, setEditedLabel] = useState(data.label);
-  const [editedAttributes, setEditedAttributes] = useState(data.attributes);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const { setNodes, getNodes } = useReactFlow();
-
-  const hasPrimaryKey = data.attributes.some((attr) => attr.isPrimaryKey);
 
   // Get node color from style
   const node = getNodes().find(n => n.id === id);
@@ -78,67 +72,21 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
   // Determine if using a non-white color
   const isColored = bgColor.toLowerCase() !== '#ffffff';
 
-  // Calculate colors based on selection
-  const headerBgColor = isColored ? createSolidColor(bgColor, 0.5) : 'transparent';
-  const rowBgColor = isColored ? createSolidColor(bgColor, 0.25) : 'transparent';
-  const rowHoverBgColor = isColored ? createSolidColor(bgColor, 0.35) : 'rgba(0, 0, 0, 0.03)';
+  // Calculate colors based on reference image pattern
+  const headerBgColor = isColored ? bgColor : 'transparent';
 
-  // Border remains visible for node definition
-  const borderColor = isDarkMode ? 'rgb(71, 85, 105)' : 'rgb(226, 232, 240)';
+  // Attribute rows use a consistent dark color (like navy #2c3e50 in reference)
+  const rowBgColor = isDarkMode ? 'rgb(30, 41, 59)' : 'rgb(44, 62, 80)';
+  const rowHoverBgColor = isDarkMode ? 'rgb(51, 65, 85)' : 'rgb(52, 73, 94)';
 
-  // Handle inline name editing
-  const handleNameDoubleClick = () => {
-    setIsEditingName(true);
-    setEditedLabel(data.label);
-  };
+  // Border color - darker for navy theme
+  const borderColor = isColored
+    ? (isDarkMode ? 'rgb(51, 65, 85)' : 'rgb(33, 47, 61)')
+    : (isDarkMode ? 'rgb(71, 85, 105)' : 'rgb(226, 232, 240)');
 
-  const handleNameSave = () => {
-    if (editedLabel.trim()) {
-      setNodes((nodes: Node[]) =>
-        nodes.map((node) =>
-          node.id === id
-            ? { ...node, data: { ...node.data, label: editedLabel.trim() } }
-            : node
-        )
-      );
-    }
-    setIsEditingName(false);
-  };
-
-  const handleNameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleNameSave();
-    } else if (e.key === 'Escape') {
-      setIsEditingName(false);
-      setEditedLabel(data.label);
-    }
-  };
-
-  // Handle inline attribute editing
-  const handleAttributeDoubleClick = (index: number) => {
-    setEditingAttribute(index);
-    setEditedAttributes([...data.attributes]);
-  };
-
-  const handleAttributeSave = () => {
-    setNodes((nodes: Node[]) =>
-      nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, attributes: editedAttributes } }
-          : node
-      )
-    );
-    setEditingAttribute(null);
-  };
-
-  const handleAttributeKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleAttributeSave();
-    } else if (e.key === 'Escape') {
-      setEditingAttribute(null);
-      setEditedAttributes(data.attributes);
-    }
-  };
+  // Text colors based on reference image
+  const headerTextColor = isColored ? '#ffffff' : (isDarkMode ? '#f1f5f9' : '#0f172a');
+  const attributeTextColor = isDarkMode ? '#e2e8f0' : '#ecf0f1';
 
   // Context menu handlers
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -273,51 +221,27 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
             backgroundColor: headerBgColor,
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
-            cursor: 'pointer',
             transition: 'all 0.2s',
           }}
-          onDoubleClick={handleNameDoubleClick}
-          title="Double-click to edit name"
         >
           <div className="flex items-center gap-3">
-            {/* Icon */}
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{
-                backgroundColor: headerBgColor,
-              }}
-            >
-              {hasPrimaryKey ? (
-                <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              )}
-            </div>
-
             {/* Name */}
-            {isEditingName ? (
-              <input
-                type="text"
-                value={editedLabel}
-                onChange={(e) => setEditedLabel(e.target.value)}
-                onBlur={handleNameSave}
-                onKeyDown={handleNameKeyDown}
-                autoFocus
-                className="flex-1 px-3 py-1.5 text-sm font-bold bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-slate-100"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span className="flex-1 text-base font-bold text-slate-900 dark:text-slate-100 truncate">
-                {data.label}
-              </span>
-            )}
+            <span
+              className="flex-1 text-base font-bold truncate"
+              style={{ color: headerTextColor }}
+            >
+              {data.label}
+            </span>
 
             {/* Entity count badge */}
-            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+            <span
+              className="px-2 py-1 text-xs font-semibold rounded-full border"
+              style={{
+                backgroundColor: isColored ? 'rgba(255, 255, 255, 0.2)' : (isDarkMode ? 'rgb(30, 41, 59)' : 'rgb(241, 245, 249)'),
+                color: headerTextColor,
+                borderColor: isColored ? 'rgba(255, 255, 255, 0.3)' : (isDarkMode ? 'rgb(51, 65, 85)' : 'rgb(226, 232, 240)')
+              }}
+            >
               {data.attributes.length}
             </span>
           </div>
@@ -338,14 +262,13 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
                 borderBottom: index < data.attributes.length - 1
                   ? borderColor
                   : 'none',
-                cursor: 'pointer',
                 position: 'relative',
                 transition: 'all 0.15s',
                 backgroundColor: rowBgColor,
                 backgroundImage: 'none',
+                borderBottomLeftRadius: index === data.attributes.length - 1 ? '12px' : '0',
+                borderBottomRightRadius: index === data.attributes.length - 1 ? '12px' : '0',
               }}
-              onDoubleClick={() => handleAttributeDoubleClick(index)}
-              title="Double-click to edit attribute"
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = rowHoverBgColor;
               }}
@@ -391,107 +314,81 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
               {/* Attribute icons */}
               <div style={{ display: 'flex', gap: '4px', minWidth: '40px', justifyContent: 'center' }}>
                 {attr.isPrimaryKey && (
-                  <span 
-                    className="px-1.5 py-0.5 rounded text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                  <span
+                    className="px-1.5 py-0.5 rounded text-xs font-semibold"
+                    style={{
+                      backgroundColor: '#f1c40f',
+                      color: '#1a1a1a',
+                      border: 'none'
+                    }}
                     title="Primary Key"
                   >
                     PK
                   </span>
                 )}
                 {attr.isForeignKey && (
-                  <span 
-                    className="px-1.5 py-0.5 rounded text-xs font-semibold bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                  <span
+                    className="px-1.5 py-0.5 rounded text-xs font-semibold"
+                    style={{
+                      backgroundColor: '#3498db',
+                      color: '#ffffff',
+                      border: 'none'
+                    }}
                     title="Foreign Key"
                   >
                     FK
                   </span>
                 )}
+                {attr.isUnique && (
+                  <span
+                    className="px-1.5 py-0.5 rounded text-xs font-semibold"
+                    style={{
+                      backgroundColor: '#3498db',
+                      color: '#ffffff',
+                      border: 'none'
+                    }}
+                    title="Unique"
+                  >
+                    U
+                  </span>
+                )}
               </div>
 
               {/* Attribute name */}
-              {editingAttribute === index ? (
-                <input
-                  type="text"
-                  value={editedAttributes[index].name}
-                  onChange={(e) => {
-                    const newAttrs = [...editedAttributes];
-                    newAttrs[index].name = e.target.value;
-                    setEditedAttributes(newAttrs);
-                  }}
-                  onBlur={handleAttributeSave}
-                  onKeyDown={handleAttributeKeyDown}
-                  autoFocus
-                  className="flex-1 px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-slate-100 font-medium"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span 
-                  className="flex-1 font-medium text-slate-800 dark:text-slate-200"
-                  style={{ fontWeight: attr.isPrimaryKey ? '700' : '500' }}
-                >
-                  {attr.name}
-                </span>
-              )}
+              <span
+                className="flex-1 font-medium"
+                style={{
+                  color: attributeTextColor,
+                  fontWeight: attr.isPrimaryKey ? '700' : '500'
+                }}
+              >
+                {attr.name}
+              </span>
 
               {/* Attribute type */}
-              {editingAttribute === index ? (
-                <SelectRoot
-                  value={editedAttributes[index].type}
-                  onValueChange={(value) => {
-                    const newAttrs = [...editedAttributes];
-                    newAttrs[index].type = value;
-                    setEditedAttributes(newAttrs);
-                  }}
-                >
-                  <Trigger
-                    className="px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-slate-100 font-medium cursor-pointer flex items-center justify-between min-w-[100px]"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Value />
-                  </Trigger>
-                  <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-                    <Item value="String" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      <ItemText>String</ItemText>
-                    </Item>
-                    <Item value="Number" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      <ItemText>Number</ItemText>
-                    </Item>
-                    <Item value="Boolean" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      <ItemText>Boolean</ItemText>
-                    </Item>
-                    <Item value="Date" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      <ItemText>Date</ItemText>
-                    </Item>
-                    <Item value="Text" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      <ItemText>Text</ItemText>
-                    </Item>
-                  </Content>
-                </SelectRoot>
-              ) : (
-                <span 
-                  className="px-2.5 py-1 text-xs font-semibold rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-mono"
-                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}
-                >
-                  {attr.type}
-                </span>
-              )}
+              <span
+                className="px-2.5 py-1 text-xs font-semibold rounded-md font-mono"
+                style={{
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                  color: attributeTextColor,
+                  border: 'none'
+                }}
+              >
+                {attr.type}
+              </span>
 
               {/* Nullable indicator */}
               {attr.isNullable && (
-                <span 
-                  className="w-5 h-5 flex items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs font-bold"
+                <span
+                  className="w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold"
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+                    color: attributeTextColor,
+                  }}
                   title="Nullable"
                 >
                   ?
-                </span>
-              )}
-
-              {/* Edit hint */}
-              {editingAttribute !== index && (
-                <span className="absolute right-2 opacity-0 group-hover:opacity-50 text-slate-400 dark:text-slate-400 transition-opacity">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
                 </span>
               )}
             </div>

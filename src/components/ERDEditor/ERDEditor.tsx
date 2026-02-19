@@ -14,7 +14,7 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { EntityNode } from '../../components/TiptapEditor/nodes/EntityNode';
-import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Edit3, Code2, ZoomIn, ZoomOut, Monitor, ChevronDown } from 'lucide-react';
+import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Code2, ZoomIn, ZoomOut, Monitor, ChevronDown } from 'lucide-react';
 import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
 import { EntityFormModal, type EntityFormData } from './EntityFormModal';
 import type { EdgeType } from './EdgeTypeSelector';
@@ -26,6 +26,7 @@ import { applyElkLayout, LayoutPresets } from '../../lib/elkLayout';
 import { getRelativeTime } from '../../lib/utils';
 import { useToast } from '../ui/Toast';
 import { formatChangeSummary, type DiagramChanges } from '@/lib/changeDetection';
+import { showAlert } from '@/lib/useAlertDialog';
 
 export interface Attribute {
   name: string;
@@ -121,6 +122,32 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useToast();
 
+  // Track previous state for change detection
+  const previousNodesRef = useRef<string>(JSON.stringify(nodes));
+  const previousEdgesRef = useRef<string>(JSON.stringify(edges));
+
+  // Validate ERD data before saving
+  const isValidERDData = useCallback((nodes: Node<EntityNodeData>[]): boolean => {
+    return nodes.every(node => {
+      if (node.type !== 'entity') return true;
+      const data = node.data;
+      // Check if entity has a valid name
+      if (!data.label || data.label.trim() === '') return false;
+      // Check if entity has at least one attribute
+      if (!data.attributes || data.attributes.length === 0) return false;
+      // Check if all attributes have valid names
+      if (!data.attributes.every(attr => attr.name && attr.name.trim() !== '')) return false;
+      return true;
+    });
+  }, []);
+
+  // Deep comparison for change detection
+  const hasDataChanged = useCallback((currentNodes: Node[], currentEdges: Edge[]): boolean => {
+    const currentNodesStr = JSON.stringify(currentNodes);
+    const currentEdgesStr = JSON.stringify(currentEdges);
+    return currentNodesStr !== previousNodesRef.current || currentEdgesStr !== previousEdgesRef.current;
+  }, []);
+
   // Handle custom events from CustomEdge component
   useEffect(() => {
     const handleDeleteEdge = (e: Event) => {
@@ -134,6 +161,21 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
         eds.map((edge) =>
           edge.id === detail.edgeId
             ? { ...edge, label: detail.newType, data: { label: detail.newType } }
+            : edge
+        )
+      );
+    };
+
+    const handleUpdateControlPoint = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { edgeId: string; x: number; y: number };
+      const reactFlowBounds = (document.querySelector('.react-flow') as HTMLElement).getBoundingClientRect();
+      const x = detail.x - reactFlowBounds.left;
+      const y = detail.y - reactFlowBounds.top;
+
+      setEdges((eds) =>
+        eds.map((edge) =>
+          edge.id === detail.edgeId
+            ? { ...edge, data: { ...edge.data, controlPoint: { x, y } } }
             : edge
         )
       );
@@ -182,6 +224,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           isPrimaryKey: attr.isPrimaryKey,
           isForeignKey: attr.isForeignKey,
           isNullable: attr.isNullable,
+          isUnique: attr.isUnique || false,
         })),
       });
       setIsEntityModalOpen(true);
@@ -189,11 +232,13 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
 
     window.addEventListener('delete-edge', handleDeleteEdge);
     window.addEventListener('change-edge-type', handleChangeEdgeType);
+    window.addEventListener('update-edge-control-point', handleUpdateControlPoint);
     window.addEventListener('edit-entity', handleEditEntity);
 
     return () => {
       window.removeEventListener('delete-edge', handleDeleteEdge);
       window.removeEventListener('change-edge-type', handleChangeEdgeType);
+      window.removeEventListener('update-edge-control-point', handleUpdateControlPoint);
       window.removeEventListener('edit-entity', handleEditEntity);
     };
   }, [setEdges]);
@@ -227,6 +272,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
                     isPrimaryKey: attr.isPrimaryKey,
                     isForeignKey: attr.isForeignKey,
                     isNullable: attr.isNullable,
+                    isUnique: attr.isUnique,
                   })),
                 },
               }
@@ -322,7 +368,10 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
             setEdges(data.edges);
           }
         } catch (err) {
-          alert('Invalid JSON file');
+          showAlert({
+            title: 'Import Failed',
+            description: 'Invalid JSON file. Please check the file format and try again.',
+          });
         }
       }
     };
@@ -372,7 +421,18 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   // Auto-save with debounce
   useEffect(() => {
     if (!onSave) return; // Only auto-save if onSave is provided
-    
+
+    // Check if data has actually changed
+    if (!hasDataChanged(nodes, edges)) {
+      return; // Skip save if no changes detected
+    }
+
+    // Validate data before saving
+    if (!isValidERDData(nodes)) {
+      console.log('Skipping auto-save: data validation failed');
+      return; // Skip save if data is invalid
+    }
+
     // Clear any existing timeout
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
@@ -385,6 +445,10 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
     autoSaveTimeoutRef.current = setTimeout(async () => {
       setIsSaving(true);
       try {
+        // Update refs before saving
+        previousNodesRef.current = JSON.stringify(nodes);
+        previousEdgesRef.current = JSON.stringify(edges);
+
         await onSave({ nodes, edges }, true); // true = auto-save
         setHasUnsavedChanges(false);
         setLastSavedAt(new Date());
@@ -401,7 +465,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [nodes, edges, onSave]);
+  }, [nodes, edges, onSave, hasDataChanged, isValidERDData]);
 
   // MiniMap node color
   const nodeColor = useCallback((node: Node) => {
@@ -533,11 +597,11 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
                   value={selectedPreset}
                   onValueChange={(value) => setSelectedPreset(value as keyof typeof LayoutPresets)}
                 >
-                  <Trigger className="px-3 py-1.5 pr-8 text-sm rounded-xl border border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800 flex items-center justify-between min-w-[120px]">
+                  <Trigger className="px-3 py-1.5 pr-8 text-sm rounded-xl border border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 focus:border-indigo-500 hover:border-slate-400 dark:hover:border-slate-500 appearance-none cursor-pointer transition-all duration-200 hover:bg-white dark:hover:bg-slate-800 flex items-center justify-between min-w-[120px] h-[34px]">
                     <Value />
                     <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
                   </Trigger>
-                  <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-lg shadow-lg">
+                  <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl shadow-lg">
                     <Item value="hierarchical" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
                       <ItemText>Hierarchical</ItemText>
                     </Item>
@@ -565,24 +629,6 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           {/* Edit Tools */}
           <div className="flex items-center gap-1 pr-3 border-r border-slate-200 dark:border-slate-700">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">Edit</span>
-
-            <Tooltip content="Edit selected entity (Click entity first)" placement="bottom">
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Edit3 className="w-4 h-4" />}
-                disabled={!selectedNodeId}
-                onClick={() => {
-                  const node = nodes.find(n => n.id === selectedNodeId);
-                  if (node) {
-                    setPendingNodePosition(node.position);
-                    setIsEntityModalOpen(true);
-                  }
-                }}
-              >
-                <span className="hidden lg:inline">Edit</span>
-              </Button>
-            </Tooltip>
 
             <Tooltip content="Delete selected" placement="bottom">
               <Button
@@ -632,6 +678,10 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           fitView
           minZoom={0.2}
           maxZoom={2}
+          nodesDraggable={true}
+          nodesConnectable={true}
+          elementsSelectable={true}
+          edgesUpdatable={true}
           defaultEdgeOptions={{
             type: 'custom',
             style: { strokeWidth: 2, stroke: '#8b5cf6' },
@@ -677,6 +727,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
         nodes={nodes}
         edges={edges}
         onDiagramChange={handleDiagramChange}
+        layoutType={selectedPreset}
       />
     </div>
   );

@@ -256,11 +256,11 @@ export function DocumentManager({ onOpenDocument, onOpenERDEditor }: DocumentMan
           <div className="flex items-center gap-3 flex-wrap">
             {/* Sort */}
             <SelectRoot value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
-              <Trigger className="flex items-center justify-between px-4 py-3 pr-10 rounded-xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200/50 dark:border-slate-700/50 focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800 min-w-[180px]">
+              <Trigger className="flex items-center justify-between px-4 py-2 pr-10 text-base rounded-xl border border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 focus:border-indigo-500 hover:border-slate-400 dark:hover:border-slate-500 appearance-none cursor-pointer transition-all duration-200 hover:bg-white dark:hover:bg-slate-800 min-w-[180px] h-[42px]">
                 <Value />
                 <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
               </Trigger>
-              <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-lg">
+              <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl shadow-lg">
                 <Item value="updatedAt" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
                   <ItemText>Last Modified</ItemText>
                 </Item>

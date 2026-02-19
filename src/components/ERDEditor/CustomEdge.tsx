@@ -1,11 +1,9 @@
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import type { EdgeProps } from 'reactflow';
 import {
-  getBezierPath,
   getMarkerEnd,
   EdgeLabelRenderer,
   BaseEdge,
-  Position,
   MarkerType,
 } from 'reactflow';
 import { cn } from '@/lib/utils';
@@ -15,6 +13,7 @@ export type EdgeType = '1:1' | '1:N' | 'N:1' | 'N:M';
 interface CustomEdgeProps extends EdgeProps {
   data?: {
     label?: EdgeType;
+    controlPoint?: { x: number; y: number };
   };
 }
 
@@ -48,14 +47,14 @@ export const CustomEdge = memo(
     const edgeType = (data?.label as EdgeType) || '1:N';
     const edgeStyle = edgeTypeStyles[edgeType];
 
-    const [edgePath] = getBezierPath({
-      sourceX,
-      sourceY,
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
-      targetX,
-      targetY,
-    });
+    // Get control point from edge data, or calculate default midpoint
+    const controlPoint = data?.controlPoint || {
+      x: (sourceX + targetX) / 2,
+      y: (sourceY + targetY) / 2 - 50, // Default curve upward
+    };
+
+    // Create path with control point
+    const edgePath = `M ${sourceX} ${sourceY} C ${sourceX} ${controlPoint.y}, ${targetX} ${controlPoint.y}, ${targetX} ${targetY}`;
 
     const markerEnd = getMarkerEnd(MarkerType.ArrowClosed);
 
@@ -77,9 +76,18 @@ export const CustomEdge = memo(
       setContextMenu(null);
     };
 
-    // Calculate label position (middle of the path)
-    const midX = (sourceX + targetX) / 2;
-    const midY = (sourceY + targetY) / 2;
+    // Calculate label position at control point
+    const labelX = controlPoint.x;
+    const labelY = controlPoint.y;
+
+    const handleControlPointDrag = useCallback((e: React.MouseEvent) => {
+      e.stopPropagation();
+      // This will be handled by the parent component
+      const updateEvent = new CustomEvent('update-edge-control-point', {
+        detail: { edgeId: id, x: e.clientX, y: e.clientY }
+      });
+      window.dispatchEvent(updateEvent);
+    }, [id]);
 
     return (
       <>
@@ -106,6 +114,24 @@ export const CustomEdge = memo(
             markerEnd={markerEnd}
           />
 
+          {/* Control point handle - visible when selected */}
+          {selected && (
+            <g
+              style={{ cursor: 'grab' }}
+              onMouseDown={handleControlPointDrag}
+            >
+              <circle
+                cx={controlPoint.x}
+                cy={controlPoint.y}
+                r={6}
+                fill="#8b5cf6"
+                stroke="white"
+                strokeWidth={2}
+                className="hover:r-8 transition-all duration-200"
+              />
+            </g>
+          )}
+
           {/* Hover overlay (invisible but wider for easier clicking) */}
           <path
             d={edgePath}
@@ -122,7 +148,7 @@ export const CustomEdge = memo(
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${midX}px, ${midY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: 'all',
             }}
             className={cn(

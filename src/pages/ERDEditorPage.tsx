@@ -3,6 +3,7 @@ import { ERDEditor } from '../components/ERDEditor/ERDEditor';
 import { useERDDiagrams } from '../hooks/useERDDiagrams';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { showAlert } from '@/lib/useAlertDialog';
 
 export function ERDEditorPage() {
   const navigate = useNavigate();
@@ -42,14 +43,20 @@ export function ERDEditorPage() {
       });
       // Only show alert for manual saves
       if (!isAutoSave) {
-        alert(`Diagram "${diagramName}" saved successfully!`);
+        showAlert({
+          title: 'Success!',
+          description: `Diagram "${diagramName}" saved successfully!`,
+        });
       }
     } else {
       // Create new diagram
       const id = await createDiagram('Untitled ERD Diagram', 'Database schema', nodes, edges);
       // Only show alert for manual saves
       if (!isAutoSave) {
-        alert(`New diagram created with ID: ${id}`);
+        showAlert({
+          title: 'Diagram Created',
+          description: `New diagram created with ID: ${id}`,
+        });
       }
       // Navigate to the new diagram
       navigate(`/erd-editor/${id}`);

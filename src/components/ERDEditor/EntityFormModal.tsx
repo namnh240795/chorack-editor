@@ -2,18 +2,19 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, Plus, Trash2, Database, ChevronDown, Link2, Link2Off } from 'lucide-react';
-import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
+import { X, Plus, Trash2, Database, Link2, Link2Off, ChevronDown } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import type { Node, Edge } from 'reactflow';
+import { cn } from '@/lib/utils';
 
 const attributeSchema = z.object({
   name: z.string().min(1, 'Attribute name is required'),
-  type: z.enum(['INT', 'VARCHAR', 'TEXT', 'BOOLEAN', 'DATE', 'DATETIME', 'DECIMAL', 'JSON']),
+  type: z.string().min(1, 'Attribute type is required'),
   isPrimaryKey: z.boolean(),
   isForeignKey: z.boolean(),
   isNullable: z.boolean(),
+  isUnique: z.boolean(),
 });
 
 const entitySchema = z.object({
@@ -35,6 +36,105 @@ const DATA_TYPES = [
   { value: 'DECIMAL', label: 'DECIMAL' },
   { value: 'JSON', label: 'JSON' },
 ] as const;
+
+// Type Autocomplete Component
+function TypeAutocomplete({
+  value,
+  onChange,
+  error,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  const filteredTypes = DATA_TYPES.filter(type =>
+    type.value.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const handleSelect = (type: string) => {
+    onChange(type);
+    setInputValue(type);
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    onChange(newValue);
+    setIsOpen(true);
+  };
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => {
+            // Delay to allow click on suggestion
+            setTimeout(() => setIsOpen(false), 200);
+          }}
+          placeholder="e.g., varchar(30)"
+          className={cn(
+            'w-full px-3 py-1.5 text-sm rounded-xl border',
+            'bg-white dark:bg-slate-800',
+            'text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600',
+            'focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-950',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            error
+              ? 'border-rose-500 dark:border-rose-500 focus:ring-rose-500 focus:border-rose-500'
+              : 'hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 focus:ring-indigo-500 border-slate-300 dark:border-slate-600',
+            'transition-all duration-200 pr-10 h-[34px]'
+          )}
+        />
+        <ChevronDown
+          className={cn(
+            'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform duration-200',
+            isOpen && 'rotate-180'
+          )}
+        />
+      </div>
+
+      {isOpen && filteredTypes.length > 0 && (
+        <div
+          className={cn(
+            'absolute z-50 w-full mt-1 bg-white dark:bg-slate-900',
+            'border border-slate-300 dark:border-slate-600',
+            'rounded-xl shadow-lg',
+            'max-h-60 overflow-y-auto'
+          )}
+        >
+          {filteredTypes.map((type) => (
+            <button
+              key={type.value}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(type.value);
+              }}
+              className="w-full px-3 py-2 text-sm text-left text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50"
+            >
+              {type.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">{error}</p>
+      )}
+    </div>
+  );
+}
 
 interface EntityFormModalProps {
   isOpen: boolean;
@@ -85,6 +185,7 @@ export function EntityFormModal({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isValid },
   } = useForm<EntityFormData>({
     resolver: zodResolver(entitySchema),
@@ -92,7 +193,7 @@ export function EntityFormModal({
     defaultValues: getDefaultEntityData(),
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: 'attributes',
   });
@@ -111,6 +212,7 @@ export function EntityFormModal({
             isPrimaryKey: attr.isPrimaryKey,
             isForeignKey: attr.isForeignKey,
             isNullable: attr.isNullable,
+            isUnique: attr.isUnique || false,
           })),
         });
       } else {
@@ -137,11 +239,8 @@ export function EntityFormModal({
       isPrimaryKey: false,
       isForeignKey: false,
       isNullable: true,
+      isUnique: false,
     });
-  };
-
-  const updateAttribute = (index: number, field: string, value: any) => {
-    update(index, { ...fields[index], [field]: value });
   };
 
   const handleClose = () => {
@@ -354,35 +453,17 @@ export function EntityFormModal({
                         />
                       </div>
 
-                      {/* Type - Radix Select with Controller */}
+                      {/* Type - Autocomplete field */}
                       <div className="w-40">
                         <Controller
                           name={`attributes.${index}.type`}
                           control={control}
-                          render={({ field: selectField }) => (
-                            <SelectRoot
-                              value={selectField.value}
-                              onValueChange={(value) => {
-                                selectField.onChange(value);
-                                updateAttribute(index, 'type', value);
-                              }}
-                            >
-                              <Trigger className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all flex items-center justify-between">
-                                <Value placeholder="Type" />
-                                <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
-                              </Trigger>
-                              <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-                                {DATA_TYPES.map((type) => (
-                                  <Item
-                                    key={type.value}
-                                    value={type.value}
-                                    className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50"
-                                  >
-                                    <ItemText>{type.label}</ItemText>
-                                  </Item>
-                                ))}
-                              </Content>
-                            </SelectRoot>
+                          render={({ field }) => (
+                            <TypeAutocomplete
+                              value={field.value}
+                              onChange={field.onChange}
+                              error={errors.attributes?.[index]?.type?.message}
+                            />
                           )}
                         />
                       </div>
@@ -409,7 +490,18 @@ export function EntityFormModal({
                             <input
                               type="checkbox"
                               checked={field.value}
-                              onChange={field.onChange}
+                              onChange={(e) => {
+                                const newValue = e.target.checked;
+                                field.onChange(newValue);
+                                // Uncheck all other PKs when this one is checked
+                                if (newValue) {
+                                  fields.forEach((_, idx) => {
+                                    if (idx !== index) {
+                                      setValue(`attributes.${idx}.isPrimaryKey`, false, { shouldDirty: true });
+                                    }
+                                  });
+                                }
+                              }}
                               className="rounded border-2 border-slate-300 dark:border-slate-600 checked:bg-indigo-500 checked:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
                             />
                             <span className="text-sm text-slate-700 dark:text-slate-300">Primary Key</span>
@@ -445,6 +537,22 @@ export function EntityFormModal({
                               className="rounded border-2 border-slate-300 dark:border-slate-600 checked:bg-indigo-500 checked:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
                             />
                             <span className="text-sm text-slate-700 dark:text-slate-300">Nullable</span>
+                          </label>
+                        )}
+                      />
+
+                      <Controller
+                        name={`attributes.${index}.isUnique`}
+                        control={control}
+                        render={({ field }) => (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="rounded border-2 border-slate-300 dark:border-slate-600 checked:bg-indigo-500 checked:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300">Unique</span>
                           </label>
                         )}
                       />
@@ -501,7 +609,7 @@ export function EntityFormModal({
                               <select
                                 value={edgeType || '1:N'}
                                 onChange={handleEdgeTypeChange(edge.id)}
-                                className="px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                                className="rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-nowrap transition-all duration-200 appearance-none cursor-pointer h-[34px]"
                               >
                                 <option value="1:1">1:1</option>
                                 <option value="1:N">1:N</option>
@@ -576,7 +684,7 @@ export function EntityFormModal({
                           </label>
                           <div className="flex gap-2">
                             <select
-                              className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                              className="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-nowrap transition-all duration-200 appearance-none cursor-pointer h-[34px]"
                               id="point-to-entity"
                             >
                               <option value="">Select entity...</option>
@@ -587,7 +695,7 @@ export function EntityFormModal({
                               ))}
                             </select>
                             <select
-                              className="w-20 px-2 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                              className="w-20 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-nowrap transition-all duration-200 appearance-none cursor-pointer h-[34px]"
                               id="point-to-type"
                             >
                               <option value="1:1">1:1</option>
@@ -619,7 +727,7 @@ export function EntityFormModal({
                           </label>
                           <div className="flex gap-2">
                             <select
-                              className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                              className="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-nowrap transition-all duration-200 appearance-none cursor-pointer h-[34px]"
                               id="point-from-entity"
                             >
                               <option value="">Select entity...</option>

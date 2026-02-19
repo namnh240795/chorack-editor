@@ -2,6 +2,7 @@ import * as React from 'react';
 import * as RadixSelect from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { inputSizes } from './Input';
 
 interface SelectOption {
   value: string;
@@ -20,12 +21,6 @@ interface SelectProps {
   className?: string;
 }
 
-const sizeStyles = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-base',
-  lg: 'px-5 py-3 text-lg',
-};
-
 export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
   ({ className, options, value, onChange, placeholder = 'Select...', disabled = false, error, size = 'md', ...props }, ref) => {
     return (
@@ -39,23 +34,24 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           <RadixSelect.Trigger
             ref={ref}
             className={cn(
-              'flex items-center justify-between w-full rounded-xl border transition-all duration-200',
-              'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950',
+              'flex items-center justify-between w-full rounded-xl transition-all duration-200',
               'bg-white dark:bg-slate-900',
+              'text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600',
+              'focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-950',
+              'border border-slate-300 dark:border-slate-600',
+              'hover:border-slate-400 dark:hover:border-slate-500 focus:border-indigo-500 focus:ring-indigo-500',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
               error
-                ? 'border-rose-500 dark:border-rose-500'
-                : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500',
-              disabled && 'opacity-50 cursor-not-allowed',
-              sizeStyles[size]
+                ? 'border-rose-500 dark:border-rose-500 focus:ring-rose-500 focus:border-rose-500'
+                : '',
+              inputSizes[size],
+              'cursor-pointer',
+              'transition-all duration-200'
             )}
           >
             <RadixSelect.Value placeholder={placeholder} />
             <RadixSelect.Icon className="ml-2">
-              <ChevronDown
-                className={cn(
-                  'w-5 h-5 text-slate-400 transition-transform duration-200'
-                )}
-              />
+              <ChevronDown className="w-4 h-4 text-slate-400" />
             </RadixSelect.Icon>
           </RadixSelect.Trigger>
 

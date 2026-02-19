@@ -13,6 +13,7 @@ interface YAMLEditorPanelProps {
   nodes: Node<EntityNodeData>[];
   edges: Edge[];
   onDiagramChange: (nodes: Node[], edges: Edge[], changes?: DiagramChanges) => void;
+  layoutType?: string;
 }
 
 export function YAMLEditorPanel({
@@ -21,6 +22,7 @@ export function YAMLEditorPanel({
   nodes,
   edges,
   onDiagramChange,
+  layoutType,
 }: YAMLEditorPanelProps) {
   const [yamlCode, setYamlCode] = useState('');
   const [isValid, setIsValid] = useState(true);
@@ -40,7 +42,7 @@ export function YAMLEditorPanel({
       originalEdgesRef.current = [...edges];
 
       if (nodes.length > 0) {
-        const yaml = diagramToYaml(nodes, edges);
+        const yaml = diagramToYaml(nodes, edges, layoutType);
         setYamlCode(yaml);
         setHasChanges(false);
         setIsValid(true);
@@ -58,13 +60,13 @@ export function YAMLEditorPanel({
   // Update YAML when diagram changes (but only if user isn't actively editing)
   useEffect(() => {
     if (isOpen && !isUserEditing && !hasChanges) {
-      const yaml = diagramToYaml(nodes, edges);
+      const yaml = diagramToYaml(nodes, edges, layoutType);
       // Only update if different to avoid cursor jumps
       if (yaml !== yamlCode) {
         setYamlCode(yaml);
       }
     }
-  }, [nodes, edges, isOpen, isUserEditing, hasChanges]);
+  }, [nodes, edges, isOpen, isUserEditing, hasChanges, layoutType]);
 
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {

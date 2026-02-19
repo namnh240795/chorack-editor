@@ -9,6 +9,7 @@ export interface ERDYamlSchema {
     name: string;
     description?: string;
     schema_version?: string;
+    layout?: string; // Layout type (e.g., 'elk', 'force', 'manual')
   };
   colors?: {
     default?: string;
@@ -24,6 +25,7 @@ export interface ERDYamlSchema {
       group?: string;
       table_name?: string;
       schema_name?: string;
+      background_color?: string; // Explicit entity background color
       fields: {
         [key: string]: {
           field_type: string;
@@ -95,16 +97,17 @@ const COLOR_MAP: Record<string, string> = {
 /**
  * Convert YAML string to ReactFlow nodes and edges
  */
-export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[] } {
+export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[]; layoutType?: string } {
   try {
     const data = yaml.load(yamlString) as ERDYamlSchema;
-    
+
     if (!data || !data.models) {
       return { nodes: [], edges: [] };
     }
 
     const nodes: Node[] = [];
     const edges: Edge[] = [];
+    const layoutType = data.metadata?.layout;
 
     // Calculate positions in a grid
     const models = Object.keys(data.models);
@@ -116,12 +119,15 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
     // Create nodes from models
     models.forEach((modelName, index) => {
       const model = data.models[modelName];
-      
+
       // Calculate grid position
       const row = Math.floor(index / gridSize);
       const col = index % gridSize;
       const x = col * (nodeWidth + gap) + 50;
       const y = row * (nodeHeight + gap) + 50;
+
+      // Get background color from YAML
+      const bgColor = model.background_color || (model.color ? COLOR_MAP[model.color] : '#ffffff');
 
       // Convert fields to attributes
       const attributes = Object.entries(model.fields || {}).map(([fieldName, field]) => ({
@@ -130,6 +136,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
         isPrimaryKey: field.attributes?.primary_key || false,
         isForeignKey: !!field.attributes?.foreign_key,
         isNullable: !field.constraints?.not_null,
+        isUnique: field.attributes?.unique || false,
       }));
 
       const node: Node<EntityNodeData> = {
@@ -140,7 +147,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
           label: model.table_name || modelName,
           attributes,
         },
-        // No background color - nodes will use neutral colors
+        ...(bgColor !== '#ffffff' && { style: { backgroundColor: bgColor } }),
       };
 
       nodes.push(node);
@@ -226,7 +233,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
       });
     });
 
-    return { nodes, edges };
+    return { nodes, edges, layoutType };
   } catch (error) {
     console.error('Error parsing YAML:', error);
     return { nodes: [], edges: [] };
@@ -236,7 +243,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
 /**
  * Convert ReactFlow nodes and edges to YAML string
  */
-export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[]): string {
+export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[], layoutType?: string): string {
   const models: ERDYamlSchema['models'] = {};
   const enums: ERDYamlSchema['enums'] = {};
 
@@ -244,11 +251,11 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[]): str
   nodes.forEach((node) => {
     const modelName = node.data.label;
     const bgColor = (node.style as any)?.backgroundColor || '#ffffff';
-    
-    // Find matching color
+
+    // Find matching color name
     let color = 'white';
     Object.entries(COLOR_MAP).forEach(([colorName, colorValue]) => {
-      if (bgColor.toLowerCase().includes(colorValue.toLowerCase())) {
+      if (bgColor.toLowerCase() === colorValue.toLowerCase()) {
         color = colorName;
       }
     });
@@ -270,6 +277,10 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[]): str
         attributes.primary_key = true;
         attributes.unique = true;
         attributes.default_value = 'cuid()';
+      }
+
+      if (attr.isUnique) {
+        attributes.unique = true;
       }
 
       if (!attr.isNullable && !attr.isPrimaryKey) {
@@ -304,6 +315,7 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[]): str
 
     models[modelName] = {
       color,
+      ...(bgColor !== '#ffffff' && { background_color: bgColor }),
       fields,
       ...(relationships.length > 0 && { relationships }),
     };
@@ -314,6 +326,7 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[]): str
     version: '1.0',
     metadata: {
       name: 'Database Schema',
+      ...(layoutType && { layout: layoutType }),
     },
     colors: {
       default: 'white',
