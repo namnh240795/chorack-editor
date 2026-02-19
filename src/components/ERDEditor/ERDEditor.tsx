@@ -14,7 +14,8 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { EntityNode } from '../../components/TiptapEditor/nodes/EntityNode';
-import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Edit3, Code2, ZoomIn, ZoomOut, Monitor } from 'lucide-react';
+import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Edit3, Code2, ZoomIn, ZoomOut, Monitor, ChevronDown } from 'lucide-react';
+import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
 import { EntityFormModal, type EntityFormData } from './EntityFormModal';
 import type { EdgeType } from './EdgeTypeSelector';
 import { Button } from '../../components/ui/Button';
@@ -528,18 +529,35 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
 
             <Tooltip content="Choose layout algorithm for automatic arrangement" placement="bottom">
               <div className="relative">
-                <select
+                <SelectRoot
                   value={selectedPreset}
-                  onChange={(e) => setSelectedPreset(e.target.value as keyof typeof LayoutPresets)}
-                  className="px-3 py-1.5 pr-8 text-sm rounded-xl border border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800"
+                  onValueChange={(value) => setSelectedPreset(value as keyof typeof LayoutPresets)}
                 >
-                  <option value="hierarchical">Hierarchical</option>
-                  <option value="topDown">Top Down</option>
-                  <option value="compact">Compact</option>
-                  <option value="spacious">Spacious</option>
-                  <option value="force">Force</option>
-                  <option value="radial">Radial</option>
-                </select>
+                  <Trigger className="px-3 py-1.5 pr-8 text-sm rounded-xl border border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800 flex items-center justify-between min-w-[120px]">
+                    <Value />
+                    <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                  </Trigger>
+                  <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-lg shadow-lg">
+                    <Item value="hierarchical" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Hierarchical
+                    </Item>
+                    <Item value="topDown" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Top Down
+                    </Item>
+                    <Item value="compact" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Compact
+                    </Item>
+                    <Item value="spacious" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Spacious
+                    </Item>
+                    <Item value="force" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Force
+                    </Item>
+                    <Item value="radial" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Radial
+                    </Item>
+                  </Content>
+                </SelectRoot>
               </div>
             </Tooltip>
           </div>

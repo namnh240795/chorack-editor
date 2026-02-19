@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, Plus, Trash2, Database } from 'lucide-react';
+import { X, Plus, Trash2, Database, ChevronDown } from 'lucide-react';
+import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
 import { Input } from '../ui/Input';
 import { Checkbox } from '../ui/Checkbox';
 import { Button } from '../ui/Button';
@@ -51,6 +52,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isValid },
   } = useForm<EntityFormData>({
     resolver: zodResolver(entitySchema),
@@ -121,11 +123,11 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
-      
+
       {/* Modal */}
       <div
         className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-in glass-strong"
@@ -234,18 +236,31 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
                         />
                       </div>
 
-                      {/* Type */}
+                      {/* Type - Radix Select */}
                       <div className="w-40">
-                        <select
-                          {...register(`attributes.${index}.type`)}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        <SelectRoot
+                          value={watch(`attributes.${index}.type`)}
+                          onValueChange={(value) => {
+                            // @ts-ignore - updating nested array field
+                            setValue(`attributes.${index}.type`, value as any);
+                          }}
                         >
-                          {DATA_TYPES.map((type) => (
-                            <option key={type.value} value={type.value}>
-                              {type.label}
-                            </option>
-                          ))}
-                        </select>
+                          <Trigger className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all flex items-center justify-between">
+                            <Value placeholder="Select type" />
+                            <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                          </Trigger>
+                          <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                            {DATA_TYPES.map((type) => (
+                              <Item
+                                key={type.value}
+                                value={type.value}
+                                className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50"
+                              >
+                                {type.label}
+                              </Item>
+                            ))}
+                          </Content>
+                        </SelectRoot>
                       </div>
 
                       {/* Remove Button */}

@@ -1,6 +1,8 @@
 import { memo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps, useReactFlow } from 'reactflow';
 import type { Node } from 'reactflow';
+import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
 
 export interface Attribute {
   name: string;
@@ -211,9 +213,46 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              // Position menu to the right of the button, vertically centered
-              setContextMenu({ x: rect.right + 8, y: rect.top + rect.height / 2 - 10 });
+              e.preventDefault();
+
+              // Get the entity node's position
+              const entityNode = (e.currentTarget as HTMLElement).closest('.react-flow__node');
+              if (!entityNode) return;
+
+              const entityRect = entityNode.getBoundingClientRect();
+
+              // Position menu at the entity's right edge (not the click position)
+              const MENU_WIDTH = 224;
+              const MENU_HEIGHT = 200;
+              const OFFSET = 2; // Small gap between entity and menu
+
+              // Calculate position
+              let menuX = entityRect.right + OFFSET;
+              let menuY = entityRect.top;
+
+              // If not enough space on the right, show on the left
+              if (menuX + MENU_WIDTH > window.innerWidth) {
+                menuX = entityRect.left - MENU_WIDTH - OFFSET;
+              }
+
+              // Ensure menu stays within viewport vertically
+              if (menuY + MENU_HEIGHT > window.innerHeight) {
+                menuY = window.innerHeight - MENU_HEIGHT - OFFSET;
+              }
+              if (menuY < OFFSET) {
+                menuY = OFFSET;
+              }
+
+              setContextMenu({ x: menuX, y: menuY });
+            }}
+            onContextMenu={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onMouseDown={(e) => {
+              // Prevent mouseDown from triggering other handlers
+              e.stopPropagation();
+              e.preventDefault();
             }}
             className="absolute top-3 right-3 z-10 w-7 h-7 rounded-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-200 shadow-sm border border-slate-200 dark:border-slate-700"
             style={{ opacity: isHovered ? '1' : '0' }}
@@ -396,22 +435,38 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
 
               {/* Attribute type */}
               {editingAttribute === index ? (
-                <select
+                <SelectRoot
                   value={editedAttributes[index].type}
-                  onChange={(e) => {
+                  onValueChange={(value) => {
                     const newAttrs = [...editedAttributes];
-                    newAttrs[index].type = e.target.value;
+                    newAttrs[index].type = value;
                     setEditedAttributes(newAttrs);
                   }}
-                  className="px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-slate-100 font-medium cursor-pointer"
-                  onClick={(e) => e.stopPropagation()}
                 >
-                  <option value="String">String</option>
-                  <option value="Number">Number</option>
-                  <option value="Boolean">Boolean</option>
-                  <option value="Date">Date</option>
-                  <option value="Text">Text</option>
-                </select>
+                  <Trigger
+                    className="px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-slate-100 font-medium cursor-pointer flex items-center justify-between min-w-[100px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Value />
+                  </Trigger>
+                  <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                    <Item value="String" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      String
+                    </Item>
+                    <Item value="Number" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Number
+                    </Item>
+                    <Item value="Boolean" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Boolean
+                    </Item>
+                    <Item value="Date" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Date
+                    </Item>
+                    <Item value="Text" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                      Text
+                    </Item>
+                  </Content>
+                </SelectRoot>
               ) : (
                 <span 
                   className="px-2.5 py-1 text-xs font-semibold rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-mono"
@@ -444,8 +499,8 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
         </div>
       </div>
 
-      {/* Context Menu */}
-      {contextMenu && (
+      {/* Context Menu - Rendered at document.body to avoid ReactFlow transforms */}
+      {contextMenu && createPortal(
         <>
           <div
             className="fixed inset-0 z-40"
@@ -529,7 +584,8 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
               Delete
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );

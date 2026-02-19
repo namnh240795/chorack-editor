@@ -20,7 +20,9 @@ import {
   FolderOpen,
   Clock,
   Database,
+  ChevronDown,
 } from 'lucide-react';
+import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
 
 type ViewMode = 'grid' | 'list';
 type SortBy = 'title' | 'createdAt' | 'updatedAt';
@@ -253,15 +255,23 @@ export function DocumentManager({ onOpenDocument, onOpenERDEditor }: DocumentMan
           {/* Right Actions */}
           <div className="flex items-center gap-3 flex-wrap">
             {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-              className="px-4 py-3 pr-10 rounded-xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200/50 dark:border-slate-700/50 focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800"
-            >
-              <option value="updatedAt">Last Modified</option>
-              <option value="createdAt">Date Created</option>
-              <option value="title">Name (A-Z)</option>
-            </select>
+            <SelectRoot value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
+              <Trigger className="flex items-center justify-between px-4 py-3 pr-10 rounded-xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200/50 dark:border-slate-700/50 focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer transition-all hover:bg-white dark:hover:bg-slate-800 min-w-[180px]">
+                <Value />
+                <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+              </Trigger>
+              <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-lg">
+                <Item value="updatedAt" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                  Last Modified
+                </Item>
+                <Item value="createdAt" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                  Date Created
+                </Item>
+                <Item value="title" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                  Name (A-Z)
+                </Item>
+              </Content>
+            </SelectRoot>
 
             {/* View Toggle */}
             <div className="flex bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-700/50 p-1">
