@@ -31,49 +31,23 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
   // Determine if we're in dark mode
   const isDarkMode = document.documentElement.classList.contains('dark');
 
-  // Color palette
+  // Color palette - saturated/darker colors
   const COLOR_PALETTE = [
-    { name: 'Yellow', value: '#fef3c7' },
-    { name: 'Red', value: '#fecaca' },
-    { name: 'Teal', value: '#99f6e4' },
-    { name: 'White', value: '#ffffff' },
-    { name: 'Blue', value: '#bfdbfe' },
-    { name: 'Green', value: '#bbf7d0' },
-    { name: 'Purple', value: '#e9d5ff' },
-    { name: 'Pink', value: '#fbcfe8' },
+    { name: 'Yellow', value: '#f59e0b' },
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Teal', value: '#14b8a6' },
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Green', value: '#22c55e' },
+    { name: 'Purple', value: '#a855f7' },
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Orange', value: '#f97316' },
   ];
 
-  // Helper to create solid color by mixing with white/black
-  const createSolidColor = (hex: string, intensity: number) => {
-    const cleanHex = hex.replace('#', '');
-    const r = parseInt(cleanHex.substring(0, 2), 16);
-    const g = parseInt(cleanHex.substring(2, 4), 16);
-    const b = parseInt(cleanHex.substring(4, 6), 16);
-
-    if (isDarkMode) {
-      // Dark mode: mix the color with dark background
-      const darkBase = 30; // slate-900
-      const factor = intensity;
-      const finalR = Math.round(r * factor + darkBase * (1 - factor));
-      const finalG = Math.round(g * factor + darkBase * (1 - factor));
-      const finalB = Math.round(b * factor + darkBase * (1 - factor));
-      return `rgb(${finalR}, ${finalG}, ${finalB})`;
-    } else {
-      // Light mode: mix the color with white background
-      const whiteBase = 255;
-      const factor = intensity;
-      const finalR = Math.round(r * factor + whiteBase * (1 - factor));
-      const finalG = Math.round(g * factor + whiteBase * (1 - factor));
-      const finalB = Math.round(b * factor + whiteBase * (1 - factor));
-      return `rgb(${finalR}, ${finalG}, ${finalB})`;
-    }
-  };
-
-  // Determine if using a non-white color
-  const isColored = bgColor.toLowerCase() !== '#ffffff';
+  // All colors are now colored (no white/transparent option)
+  const isColored = true;
 
   // Calculate colors based on reference image pattern
-  const headerBgColor = isColored ? bgColor : 'transparent';
+  const headerBgColor = bgColor;
 
   // Attribute rows use a consistent dark color (like navy #2c3e50 in reference)
   const rowBgColor = isDarkMode ? 'rgb(30, 41, 59)' : 'rgb(44, 62, 80)';

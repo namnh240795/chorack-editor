@@ -1,0 +1,326 @@
+# E-Commerce Database Schema
+# Simple example showing products, orders, and customers
+
+diagram_type: erd
+version: '1.0'
+
+metadata:
+  name: E-Commerce Database
+  description: Core tables for an online store
+
+colors:
+  default: white
+  rules:
+    - pattern: '^(Customer|User)'
+      color: yellow
+      group: Users
+    - pattern: '^(Product|Category)'
+      color: teal
+      group: Catalog
+    - pattern: '^(Order|OrderItem)'
+      color: red
+      group: Orders
+
+models:
+  Customer:
+    color: yellow
+    group: Users
+    fields:
+      id:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          primary_key: true
+          unique: true
+          default_value: cuid()
+        constraints:
+          not_null: true
+
+      email:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          unique: true
+        constraints:
+          not_null: true
+
+      name:
+        field_type: String
+        db_type: VARCHAR(255)
+        constraints:
+          not_null: true
+
+      createdAt:
+        field_type: Int
+        db_type: INTEGER
+        attributes:
+          default_value: now()
+
+    relationships:
+      - name: customer_orders
+        field: id
+        to_model: Order
+        to_field: customerId
+        relationship_type: 1:N
+        on_delete: CASCADE
+        on_update: CASCADE
+
+    indexes:
+      - index_name: idx_customer_email
+        columns: [email]
+        unique: true
+
+  Product:
+    color: teal
+    group: Catalog
+    fields:
+      id:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          primary_key: true
+          unique: true
+          default_value: cuid()
+        constraints:
+          not_null: true
+
+      name:
+        field_type: String
+        db_type: VARCHAR(255)
+        constraints:
+          not_null: true
+
+      price:
+        field_type: String
+        db_type: DECIMAL(10,2)
+        constraints:
+          not_null: true
+
+      stock:
+        field_type: String
+        db_type: INTEGER
+        constraints:
+          not_null: true
+
+      categoryId:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          foreign_key:
+            table: Category
+            column: id
+            on_delete: RESTRICT
+        constraints:
+          not_null: true
+
+    relationships:
+      - name: product_category
+        field: categoryId
+        to_model: Category
+        to_field: id
+        relationship_type: N:1
+        on_delete: RESTRICT
+        on_update: CASCADE
+
+      - name: product_orderItems
+        field: id
+        to_model: OrderItem
+        to_field: productId
+        relationship_type: 1:N
+        on_delete: CASCADE
+        on_update: CASCADE
+
+    indexes:
+      - index_name: idx_product_category
+        columns: [categoryId]
+
+  Category:
+    color: teal
+    group: Catalog
+    fields:
+      id:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          primary_key: true
+          unique: true
+          default_value: cuid()
+        constraints:
+          not_null: true
+
+      name:
+        field_type: String
+        db_type: VARCHAR(255)
+        constraints:
+          not_null: true
+
+      slug:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          unique: true
+        constraints:
+          not_null: true
+
+    relationships:
+      - name: category_products
+        field: id
+        to_model: Product
+        to_field: categoryId
+        relationship_type: 1:N
+        on_delete: CASCADE
+        on_update: CASCADE
+
+  Order:
+    color: red
+    group: Orders
+    fields:
+      id:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          primary_key: true
+          unique: true
+          default_value: cuid()
+        constraints:
+          not_null: true
+
+      customerId:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          foreign_key:
+            table: Customer
+            column: id
+            on_delete: CASCADE
+        constraints:
+          not_null: true
+
+      status:
+        field_type: String
+        db_type: VARCHAR(50)
+        attributes:
+          default_value: pending
+          enum: OrderStatus
+        constraints:
+          not_null: true
+
+      total:
+        field_type: String
+        db_type: DECIMAL(10,2)
+        constraints:
+          not_null: true
+
+      createdAt:
+        field_type: Int
+        db_type: INTEGER
+        attributes:
+          default_value: now()
+
+    relationships:
+      - name: order_customer
+        field: customerId
+        to_model: Customer
+        to_field: id
+        relationship_type: N:1
+        on_delete: CASCADE
+        on_update: CASCADE
+
+      - name: order_items
+        field: id
+        to_model: OrderItem
+        to_field: orderId
+        relationship_type: 1:N
+        on_delete: CASCADE
+        on_update: CASCADE
+
+    indexes:
+      - index_name: idx_order_customer
+        columns: [customerId]
+      - index_name: idx_order_status
+        columns: [status]
+
+  OrderItem:
+    color: red
+    group: Orders
+    fields:
+      id:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          primary_key: true
+          unique: true
+          default_value: cuid()
+        constraints:
+          not_null: true
+
+      orderId:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          foreign_key:
+            table: Order
+            column: id
+            on_delete: CASCADE
+        constraints:
+          not_null: true
+
+      productId:
+        field_type: String
+        db_type: VARCHAR(255)
+        attributes:
+          foreign_key:
+            table: Product
+            column: id
+            on_delete: RESTRICT
+        constraints:
+          not_null: true
+
+      quantity:
+        field_type: String
+        db_type: INTEGER
+        constraints:
+          not_null: true
+
+      price:
+        field_type: String
+        db_type: DECIMAL(10,2)
+        constraints:
+          not_null: true
+
+    relationships:
+      - name: item_order
+        field: orderId
+        to_model: Order
+        to_field: id
+        relationship_type: N:1
+        on_delete: CASCADE
+        on_update: CASCADE
+
+      - name: item_product
+        field: productId
+        to_model: Product
+        to_field: id
+        relationship_type: N:1
+        on_delete: RESTRICT
+        on_update: CASCADE
+
+    indexes:
+      - index_name: idx_orderItem_order
+        columns: [orderId]
+      - index_name: idx_orderItem_product
+        columns: [productId]
+
+enums:
+  OrderStatus:
+    values:
+      - value_name: pending
+        description: Order is pending
+      - value_name: processing
+        description: Order is being processed
+      - value_name: shipped
+        description: Order has been shipped
+      - value_name: delivered
+        description: Order has been delivered
+      - value_name: cancelled
+        description: Order was cancelled

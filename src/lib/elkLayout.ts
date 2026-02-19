@@ -38,12 +38,13 @@ export interface ElkLayoutConfig {
  * Default layout configuration optimized for ERD diagrams
  */
 const DEFAULT_ERD_CONFIG: ElkLayoutConfig = {
-  direction: 'RIGHT',
+  direction: 'DOWN',
   algorithm: 'layered',
-  nodeSpacing: 80,
-  edgeSpacing: 40,
-  layerSpacing: 100,
+  nodeSpacing: 120,
+  edgeSpacing: 60,
+  layerSpacing: 150,
   separateConnectedComponents: true,
+  aspectRatio: 1.6,
 };
 
 /**
@@ -56,34 +57,49 @@ function toElkGraph(
 ): ElkNode {
   const effectiveConfig = { ...DEFAULT_ERD_CONFIG, ...config };
 
+  // Get valid node IDs
+  const validNodeIds = new Set(nodes.map(n => n.id));
+
+  // Filter edges to only include those with valid source and target nodes
+  const validEdges = edges.filter(
+    edge => validNodeIds.has(edge.source) && validNodeIds.has(edge.target)
+  );
+
   return {
     id: 'root',
     layoutOptions: {
-      'elk.direction': effectiveConfig.direction || 'RIGHT',
+      'elk.direction': effectiveConfig.direction || 'DOWN',
       'elk.algorithm': effectiveConfig.algorithm || 'layered',
-      'elk.spacing.nodeNode': `${effectiveConfig.nodeSpacing || 80}`,
-      'elk.spacing.edgeNode': `${effectiveConfig.edgeSpacing || 40}`,
-      'elk.layered.spacing.nodeNodeBetweenLayers': `${effectiveConfig.layerSpacing || 100}`,
+      'elk.spacing.nodeNode': `${effectiveConfig.nodeSpacing || 120}`,
+      'elk.spacing.edgeNode': `${effectiveConfig.edgeSpacing || 60}`,
+      'elk.layered.spacing.nodeNodeBetweenLayers': `${effectiveConfig.layerSpacing || 150}`,
       'elk.separateConnectedComponents': `${effectiveConfig.separateConnectedComponents !== false}`,
+      'elk.aspectRatio': `${effectiveConfig.aspectRatio || 1.6}`,
       // ERD-specific optimizations
       'elk.layered.cycleBreaking.strategy': 'GREEDY',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-      'elk.layered.considerModelOrder.strategy': 'PREFER_EDGES',
+      'elk.layered.crossingMinimization.semiInteractive': 'true',
+      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
       // Port settings for better edge routing
       'elk.port.clustering.threshold': '0',
       'elk.layered.edgeRouting.strategy': 'ORTHOGONAL',
+      'elk.layered.edgeRouting.orthogonalPreferred': 'true',
+      'elk.spacing.edgeNodeSpacing': '40',
+      'elk.spacing.edgeSpacing': '30',
     },
     children: nodes.map((node) => ({
       id: node.id,
-      width: Number(node.style?.width || 250),  // Default node width
-      height: Number(node.style?.height || 200), // Default node height
+      // Estimate size based on entity data (header + attributes)
+      width: 220,
+      height: 60 + (node.data.attributes?.length || 1) * 40,
       // Preserve node-specific properties
       properties: {
-        'elk.padding': '[top=10,left=10,bottom=10,right=10]',
+        'elk.padding': '[top=15,left=15,bottom=15,right=15]',
+        'elk.nodeLabels.placement': 'INSIDE V_CENTER H_CENTER',
       },
     })),
-    edges: edges.map((edge) => ({
+    edges: validEdges.map((edge) => ({
       id: edge.id,
       sources: [edge.source],
       targets: [edge.target],

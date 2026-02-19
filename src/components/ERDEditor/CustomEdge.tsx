@@ -14,6 +14,9 @@ interface CustomEdgeProps extends EdgeProps {
   data?: {
     label?: EdgeType;
     controlPoint?: { x: number; y: number };
+    controlPoint2?: { x: number; y: number }; // Second control point for more complex curves
+    edgeStyle?: 'smoothstep' | 'straight' | 'orthogonal';
+    labelPosition?: { x: number; y: number };
   };
 }
 
@@ -43,8 +46,10 @@ const edgeTypeStyles: Record<EdgeType, { color: string; dashArray: string; strok
 export const CustomEdge = memo(
   ({ id, sourceX, sourceY, targetX, targetY, selected, data, style }: CustomEdgeProps) => {
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-    
+    const [isDraggingLabel, setIsDraggingLabel] = useState(false);
+
     const edgeType = (data?.label as EdgeType) || '1:N';
+    const edgeStyleType = data?.edgeStyle || 'smoothstep';
     const edgeStyle = edgeTypeStyles[edgeType];
 
     // Get control point from edge data, or calculate default midpoint
@@ -53,8 +58,41 @@ export const CustomEdge = memo(
       y: (sourceY + targetY) / 2 - 50, // Default curve upward
     };
 
-    // Create path with control point
-    const edgePath = `M ${sourceX} ${sourceY} C ${sourceX} ${controlPoint.y}, ${targetX} ${controlPoint.y}, ${targetX} ${targetY}`;
+    // Get label position (default to control point if not set)
+    const labelPosition = data?.labelPosition || controlPoint;
+
+    // Create path based on edge style
+    const edgePath = getEdgePath(edgeStyleType, sourceX, sourceY, targetX, targetY, controlPoint);
+
+    function getEdgePath(
+      style: string,
+      sx: number,
+      sy: number,
+      tx: number,
+      ty: number,
+      cp: { x: number; y: number }
+    ): string {
+      const midX = cp.x;
+      const midY = cp.y;
+
+      if (style === 'straight') {
+        return `M ${sx} ${sy} L ${tx} ${ty}`;
+      }
+
+      if (style === 'orthogonal') {
+        // Orthogonal with 90-degree turns
+        const midX = (sx + tx) / 2;
+        return `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty} L ${tx} ${ty}`;
+      }
+
+      // Default smoothstep with rounded corners
+      return `M ${sx} ${sy}
+        L ${midX} ${sy}
+        Q ${midX} ${midY}, ${midX} ${midY}
+        L ${midX} ${ty}
+        Q ${midX} ${ty}, ${tx} ${ty}
+        L ${tx} ${ty}`;
+    }
 
     const markerEnd = getMarkerEnd(MarkerType.ArrowClosed);
 
@@ -76,18 +114,63 @@ export const CustomEdge = memo(
       setContextMenu(null);
     };
 
-    // Calculate label position at control point
-    const labelX = controlPoint.x;
-    const labelY = controlPoint.y;
+    const handleChangeStyle = (newStyle: 'smoothstep' | 'straight' | 'orthogonal') => {
+      const changeEvent = new CustomEvent('change-edge-style', { detail: { edgeId: id, newStyle } });
+      window.dispatchEvent(changeEvent);
+      setContextMenu(null);
+    };
 
-    const handleControlPointDrag = useCallback((e: React.MouseEvent) => {
+    const handleControlPointMouseDown = useCallback((e: React.MouseEvent) => {
       e.stopPropagation();
-      // This will be handled by the parent component
-      const updateEvent = new CustomEvent('update-edge-control-point', {
-        detail: { edgeId: id, x: e.clientX, y: e.clientY }
-      });
-      window.dispatchEvent(updateEvent);
+      e.preventDefault();
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const reactFlowBounds = (document.querySelector('.react-flow') as HTMLElement).getBoundingClientRect();
+        const x = moveEvent.clientX - reactFlowBounds.left;
+        const y = moveEvent.clientY - reactFlowBounds.top;
+
+        const updateEvent = new CustomEvent('update-edge-control-point', {
+          detail: { edgeId: id, x, y }
+        });
+        window.dispatchEvent(updateEvent);
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }, [id]);
+
+    const handleLabelMouseDown = useCallback((e: React.MouseEvent) => {
+      if (!selected) return; // Only allow dragging when edge is selected
+      
+      e.stopPropagation();
+      e.preventDefault();
+      setIsDraggingLabel(true);
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const reactFlowBounds = (document.querySelector('.react-flow') as HTMLElement).getBoundingClientRect();
+        const x = moveEvent.clientX - reactFlowBounds.left;
+        const y = moveEvent.clientY - reactFlowBounds.top;
+
+        const updateEvent = new CustomEvent('update-edge-label-position', {
+          detail: { edgeId: id, x, y }
+        });
+        window.dispatchEvent(updateEvent);
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        setIsDraggingLabel(false);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }, [id, selected]);
 
     return (
       <>
@@ -115,10 +198,10 @@ export const CustomEdge = memo(
           />
 
           {/* Control point handle - visible when selected */}
-          {selected && (
+          {selected && edgeStyleType !== 'straight' && (
             <g
               style={{ cursor: 'grab' }}
-              onMouseDown={handleControlPointDrag}
+              onMouseDown={handleControlPointMouseDown}
             >
               <circle
                 cx={controlPoint.x}
@@ -148,8 +231,9 @@ export const CustomEdge = memo(
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelPosition.x}px, ${labelPosition.y}px)`,
               pointerEvents: 'all',
+              cursor: selected ? 'grab' : 'default',
             }}
             className={cn(
               'px-2 py-1 text-xs font-semibold rounded-lg transition-all duration-200',
@@ -161,11 +245,16 @@ export const CustomEdge = memo(
               edgeType === '1:1' && 'text-blue-600 dark:text-blue-400',
               edgeType === '1:N' && 'text-violet-600 dark:text-violet-400',
               edgeType === 'N:1' && 'text-violet-600 dark:text-violet-400',
-              edgeType === 'N:M' && 'text-pink-600 dark:text-pink-400'
+              edgeType === 'N:M' && 'text-pink-600 dark:text-pink-400',
+              isDraggingLabel && 'cursor-grabbing'
             )}
             onContextMenu={handleContextMenu}
+            onMouseDown={handleLabelMouseDown}
           >
             {edgeType}
+            {selected && (
+              <div className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full opacity-50" />
+            )}
           </div>
         </EdgeLabelRenderer>
 
@@ -226,6 +315,49 @@ export const CustomEdge = memo(
               >
                 <span className="w-2 h-2 rounded-full bg-pink-500" />
                 Many to Many (N:M)
+              </button>
+              
+              <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
+
+              {/* Edge Style */}
+              <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Edge Style
+              </div>
+              <button
+                onClick={() => handleChangeStyle('smoothstep')}
+                className={cn(
+                  'w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 text-sm',
+                  edgeStyleType === 'smoothstep' && 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400'
+                )}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                </svg>
+                Smooth Step
+              </button>
+              <button
+                onClick={() => handleChangeStyle('straight')}
+                className={cn(
+                  'w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 text-sm',
+                  edgeStyleType === 'straight' && 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400'
+                )}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20L20 4" />
+                </svg>
+                Straight
+              </button>
+              <button
+                onClick={() => handleChangeStyle('orthogonal')}
+                className={cn(
+                  'w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 text-sm',
+                  edgeStyleType === 'orthogonal' && 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400'
+                )}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h4l2-4 2 8 2-4h4" />
+                </svg>
+                Orthogonal
               </button>
               
               <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />

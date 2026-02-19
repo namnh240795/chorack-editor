@@ -158,6 +158,7 @@ const getDefaultEntityData = (): EntityFormData => ({
       isPrimaryKey: true,
       isForeignKey: false,
       isNullable: false,
+      isUnique: false,
     },
   ],
 });
@@ -386,7 +387,7 @@ export function EntityFormModal({
                   control={control}
                   render={({ field }) => (
                     <div className="flex items-center gap-2 flex-wrap">
-                      {['#ffffff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24', '#f59e0b', '#d97706', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#fecaca', '#fca5a5', '#f87171', '#ef4444'].map((color) => (
+                      {['#f59e0b', '#f97316', '#ef4444', '#dc2626', '#ec4899', '#14b8a6', '#0d9488', '#3b82f6', '#2563eb', '#22c55e', '#16a34a', '#a855f7', '#9333ea', '#7c3aed'].map((color) => (
                         <label key={color} className="cursor-pointer">
                           <input
                             {...field}

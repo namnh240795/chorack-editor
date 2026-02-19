@@ -84,14 +84,14 @@ export interface ERDYamlSchema {
 
 // Color mapping from YAML to CSS
 const COLOR_MAP: Record<string, string> = {
-  yellow: '#fef3c7', // amber-100
-  red: '#fecaca', // red-200
-  teal: '#99f6e4', // teal-200
-  white: '#ffffff',
-  blue: '#bfdbfe', // blue-200
-  green: '#bbf7d0', // green-200
-  purple: '#e9d5ff', // purple-200
-  pink: '#fbcfe8', // pink-200
+  yellow: '#f59e0b', // amber-500
+  red: '#ef4444', // red-500
+  teal: '#14b8a6', // teal-500
+  blue: '#3b82f6', // blue-500
+  green: '#22c55e', // green-500
+  purple: '#a855f7', // purple-500
+  pink: '#ec4899', // pink-500
+  orange: '#f97316', // orange-500
 };
 
 /**
@@ -127,7 +127,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
       const y = row * (nodeHeight + gap) + 50;
 
       // Get background color from YAML
-      const bgColor = model.background_color || (model.color ? COLOR_MAP[model.color] : '#ffffff');
+      const bgColor = model.background_color || (model.color ? COLOR_MAP[model.color] : COLOR_MAP.blue);
 
       // Convert fields to attributes
       const attributes = Object.entries(model.fields || {}).map(([fieldName, field]) => ({
@@ -147,7 +147,7 @@ export function yamlToDiagram(yamlString: string): { nodes: Node[]; edges: Edge[
           label: model.table_name || modelName,
           attributes,
         },
-        ...(bgColor !== '#ffffff' && { style: { backgroundColor: bgColor } }),
+        style: { backgroundColor: bgColor },
       };
 
       nodes.push(node);
@@ -250,10 +250,10 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[], layo
   // Process each node (entity)
   nodes.forEach((node) => {
     const modelName = node.data.label;
-    const bgColor = (node.style as any)?.backgroundColor || '#ffffff';
+    const bgColor = (node.style as any)?.backgroundColor || COLOR_MAP.blue;
 
     // Find matching color name
-    let color = 'white';
+    let color = 'blue';
     Object.entries(COLOR_MAP).forEach(([colorName, colorValue]) => {
       if (bgColor.toLowerCase() === colorValue.toLowerCase()) {
         color = colorName;
@@ -315,7 +315,7 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[], layo
 
     models[modelName] = {
       color,
-      ...(bgColor !== '#ffffff' && { background_color: bgColor }),
+      background_color: bgColor,
       fields,
       ...(relationships.length > 0 && { relationships }),
     };
@@ -329,7 +329,7 @@ export function diagramToYaml(nodes: Node<EntityNodeData>[], edges: Edge[], layo
       ...(layoutType && { layout: layoutType }),
     },
     colors: {
-      default: 'white',
+      default: 'blue',
     },
     models,
   };
@@ -359,7 +359,7 @@ export function generateDefaultYAML(): string {
       schema_version: '1.0.0',
     },
     colors: {
-      default: 'white',
+      default: 'blue',
       rules: [
         {
           pattern: '^(User|Account|Session)',

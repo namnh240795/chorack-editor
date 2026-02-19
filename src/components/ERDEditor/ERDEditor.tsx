@@ -23,10 +23,11 @@ import { Tooltip } from '../../components/ui/Tooltip';
 import { CustomEdge } from './CustomEdge';
 import { YAMLEditorPanel } from '../../components/YAMLEditorPanel';
 import { applyElkLayout, LayoutPresets } from '../../lib/elkLayout';
-import { getRelativeTime } from '../../lib/utils';
 import { useToast } from '../ui/Toast';
 import { formatChangeSummary, type DiagramChanges } from '@/lib/changeDetection';
 import { showAlert } from '@/lib/useAlertDialog';
+
+export type EdgeStyleType = 'smoothstep' | 'straight' | 'orthogonal';
 
 export interface Attribute {
   name: string;
@@ -34,6 +35,7 @@ export interface Attribute {
   isPrimaryKey: boolean;
   isForeignKey: boolean;
   isNullable: boolean;
+  isUnique: boolean;
 }
 
 export interface EntityNodeData {
@@ -111,7 +113,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   const [pendingNodePosition, setPendingNodePosition] = useState<{ x: number; y: number } | null>(null);
   const [editingNodeData, setEditingNodeData] = useState<EntityFormData | null>(null);
   const [selectedEdgeType] = useState<EdgeType>('1:N');
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeStyle, setSelectedEdgeStyle] = useState<EdgeStyleType>('smoothstep');
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [isYamlPanelOpen, setIsYamlPanelOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<keyof typeof LayoutPresets>('hierarchical');
@@ -181,6 +183,28 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
       );
     };
 
+    const handleChangeEdgeStyle = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { edgeId: string; newStyle: EdgeStyleType };
+      setEdges((eds) =>
+        eds.map((edge) =>
+          edge.id === detail.edgeId
+            ? { ...edge, data: { ...edge.data, edgeStyle: detail.newStyle } }
+            : edge
+        )
+      );
+    };
+
+    const handleUpdateLabelPosition = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { edgeId: string; x: number; y: number };
+      setEdges((eds) =>
+        eds.map((edge) =>
+          edge.id === detail.edgeId
+            ? { ...edge, data: { ...edge.data, labelPosition: { x: detail.x, y: detail.y } } }
+            : edge
+        )
+      );
+    };
+
     const handleEditEntity = (e: Event) => {
       const detail = (e as CustomEvent).detail as { nodeId: string; node: Node };
       setEditingNodeId(detail.nodeId);
@@ -192,7 +216,6 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
           return type;
         }
 
-        // Common type mappings
         const typeMap: Record<string, string> = {
           'String': 'VARCHAR',
           'Number': 'DECIMAL',
@@ -230,25 +253,27 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
       setIsEntityModalOpen(true);
     };
 
+    // Register all event listeners
     window.addEventListener('delete-edge', handleDeleteEdge);
     window.addEventListener('change-edge-type', handleChangeEdgeType);
     window.addEventListener('update-edge-control-point', handleUpdateControlPoint);
+    window.addEventListener('change-edge-style', handleChangeEdgeStyle);
+    window.addEventListener('update-edge-label-position', handleUpdateLabelPosition);
     window.addEventListener('edit-entity', handleEditEntity);
 
     return () => {
       window.removeEventListener('delete-edge', handleDeleteEdge);
       window.removeEventListener('change-edge-type', handleChangeEdgeType);
       window.removeEventListener('update-edge-control-point', handleUpdateControlPoint);
+      window.removeEventListener('change-edge-style', handleChangeEdgeStyle);
+      window.removeEventListener('update-edge-label-position', handleUpdateLabelPosition);
       window.removeEventListener('edit-entity', handleEditEntity);
     };
   }, [setEdges]);
 
   // Handle canvas click - deselect nodes
-  const onPaneClick = useCallback((event: React.MouseEvent) => {
-    // Deselect nodes when clicking on canvas
-    if (event.target === event.currentTarget) {
-      setSelectedNodeId(null);
-    }
+  const onPaneClick = useCallback(() => {
+    // Deselect nodes when clicking on canvas (handled by ReactFlow)
   }, []);
 
 
@@ -296,6 +321,7 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
             isPrimaryKey: attr.isPrimaryKey,
             isForeignKey: attr.isForeignKey,
             isNullable: attr.isNullable,
+            isUnique: attr.isUnique || false,
           })),
         },
       };
@@ -307,28 +333,31 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
   // Handle connection creation - use selected edge type
   const onConnect = useCallback(
     (connection: Connection) => {
+      // Calculate default control point - will be updated when edge is rendered
       const edge = {
         ...connection,
         type: 'custom',
         label: selectedEdgeType,
-        data: { label: selectedEdgeType },
+        data: { 
+          label: selectedEdgeType,
+          edgeStyle: selectedEdgeStyle,
+        },
         style: { stroke: '#8b5cf6', strokeWidth: 2 },
       };
       setEdges((eds) => addEdge(edge, eds));
     },
-    [selectedEdgeType, setEdges]
+    [selectedEdgeType, selectedEdgeStyle, setEdges]
   );
 
   // Handle node selection
-  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setSelectedNodeId(node.id);
+  const onNodeClick = useCallback(() => {
+    // Node selection is handled by ReactFlow
   }, []);
 
   // Delete selected nodes/edges
   const onDelete = useCallback(() => {
     setNodes((nds) => nds.filter((node) => !node.selected));
     setEdges((eds) => eds.filter((edge) => !edge.selected));
-    setSelectedNodeId(null);
   }, [setNodes, setEdges]);
 
   // Clear all
@@ -336,7 +365,6 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
     if (confirm('Are you sure you want to clear the entire diagram?')) {
       setNodes([]);
       setEdges([]);
-      setSelectedNodeId(null);
     }
   }, [setNodes, setEdges]);
 
@@ -387,14 +415,18 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
 
   // Auto layout using ELK
   const autoLayout = useCallback(async () => {
-    if (nodes.length === 0) return;
-    
     setIsLayouting(true);
     try {
+      if (nodes.length === 0) return;
+
       const { nodes: layoutedNodes } = await applyElkLayout(nodes, edges, LayoutPresets[selectedPreset]);
       setNodes(layoutedNodes);
     } catch (error) {
       console.error('Layout failed:', error);
+      showAlert({
+        title: 'Layout Failed',
+        description: 'Could not apply automatic layout. Please check your diagram and try again.',
+      });
     } finally {
       setIsLayouting(false);
     }
@@ -522,9 +554,9 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
                 value={selectedPreset}
                 onValueChange={(value) => setSelectedPreset(value as keyof typeof LayoutPresets)}
               >
-                <Trigger className="px-3 py-1.5 pr-7 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 focus:border-indigo-500 hover:border-slate-400 dark:hover:border-slate-500 appearance-none cursor-pointer transition-all duration-200 hover:bg-white dark:hover:bg-slate-800 flex items-center justify-between min-w-[100px] h-[34px]">
-                  <Value />
-                  <ChevronDown className="w-3.5 h-3.5 ml-1.5 opacity-50" />
+                <Trigger className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 focus:border-indigo-500 hover:border-slate-400 dark:hover:border-slate-500 appearance-none cursor-pointer transition-all duration-200 hover:bg-white dark:hover:bg-slate-800 flex items-center min-w-[100px] h-[34px]">
+                  <Value placeholder="Select layout" />
+                  <ChevronDown className="w-4 h-4 ml-2 mr-1 opacity-50 shrink-0" />
                 </Trigger>
                 <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg">
                   <Item value="hierarchical" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
@@ -544,6 +576,30 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
                   </Item>
                   <Item value="radial" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
                     <ItemText>Radial</ItemText>
+                  </Item>
+                </Content>
+              </SelectRoot>
+            </div>
+
+            {/* Edge Style Selector */}
+            <div className="relative">
+              <SelectRoot
+                value={selectedEdgeStyle}
+                onValueChange={(value) => setSelectedEdgeStyle(value as EdgeStyleType)}
+              >
+                <Trigger className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80 backdrop-blur text-slate-900 dark:text-slate-100 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 focus:border-indigo-500 hover:border-slate-400 dark:hover:border-slate-500 appearance-none cursor-pointer transition-all duration-200 hover:bg-white dark:hover:bg-slate-800 flex items-center min-w-[110px] h-[34px]">
+                  <Value placeholder="Edge style" />
+                  <ChevronDown className="w-4 h-4 ml-2 mr-1 opacity-50 shrink-0" />
+                </Trigger>
+                <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg">
+                  <Item value="smoothstep" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                    <ItemText>Smooth Step</ItemText>
+                  </Item>
+                  <Item value="straight" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                    <ItemText>Straight</ItemText>
+                  </Item>
+                  <Item value="orthogonal" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
+                    <ItemText>Orthogonal</ItemText>
                   </Item>
                 </Content>
               </SelectRoot>
