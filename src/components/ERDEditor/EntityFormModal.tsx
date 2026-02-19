@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Plus, Trash2, Database, ChevronDown } from 'lucide-react';
@@ -19,7 +19,7 @@ const attributeSchema = z.object({
 const entitySchema = z.object({
   name: z.string().min(1, 'Entity name is required').max(50, 'Entity name too long'),
   attributes: z.array(attributeSchema).min(1, 'At least one attribute is required'),
-  color: z.string().optional(),
+  color: z.string(),
 });
 
 export type EntityFormData = z.infer<typeof entitySchema>;
@@ -43,57 +43,61 @@ interface EntityFormModalProps {
   initialData?: EntityFormData;
 }
 
+// Helper to create default entity data
+const getDefaultEntityData = (): EntityFormData => ({
+  name: '',
+  color: '#ffffff',
+  attributes: [
+    {
+      name: 'id',
+      type: 'INT',
+      isPrimaryKey: true,
+      isForeignKey: false,
+      isNullable: false,
+    },
+  ],
+});
+
 export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: EntityFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditMode = !!initialData;
 
   const {
     register,
     control,
     handleSubmit,
     reset,
-    watch,
-    setValue,
     formState: { errors, isValid },
   } = useForm<EntityFormData>({
     resolver: zodResolver(entitySchema),
-    mode: 'onChange', // Enable real-time validation
-    defaultValues: initialData || {
-      name: '',
-      color: '#ffffff',
-      attributes: [
-        {
-          name: 'id',
-          type: 'INT',
-          isPrimaryKey: true,
-          isForeignKey: false,
-          isNullable: false,
-        },
-      ],
-    },
+    mode: 'onChange',
+    defaultValues: getDefaultEntityData(),
   });
-
-  const selectedColor = watch('color', '#ffffff');
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'attributes',
   });
 
+  // Reset form when modal opens/closes or initialData changes
   useEffect(() => {
     if (isOpen) {
-      reset(initialData || {
-        name: '',
-        color: '#ffffff',
-        attributes: [
-          {
-            name: 'id',
-            type: 'INT',
-            isPrimaryKey: true,
-            isForeignKey: false,
-            isNullable: false,
-          },
-        ],
-      });
+      if (initialData) {
+        // Deep clone to avoid reference issues
+        reset({
+          name: initialData.name,
+          color: initialData.color || '#ffffff',
+          attributes: initialData.attributes.map(attr => ({
+            name: attr.name,
+            type: attr.type,
+            isPrimaryKey: attr.isPrimaryKey,
+            isForeignKey: attr.isForeignKey,
+            isNullable: attr.isNullable,
+          })),
+        });
+      } else {
+        reset(getDefaultEntityData());
+      }
     }
   }, [isOpen, initialData, reset]);
 
@@ -101,7 +105,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
     setIsSubmitting(true);
     try {
       await onSubmit(data);
-      reset();
+      reset(getDefaultEntityData());
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -118,6 +122,11 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
     });
   };
 
+  const handleClose = () => {
+    reset(getDefaultEntityData());
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -125,7 +134,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal */}
@@ -141,7 +150,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                {initialData ? 'Edit Entity' : 'New Entity'}
+                {isEditMode ? 'Edit Entity' : 'New Entity'}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Define entity attributes and constraints
@@ -149,7 +158,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
             </div>
           </div>
           <Button
-            onClick={onClose}
+            onClick={handleClose}
             variant="ghost"
             size="sm"
             isSquared
@@ -178,27 +187,35 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Entity Color
                 </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {['#ffffff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24', '#f59e0b', '#d97706', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#fecaca', '#fca5a5', '#f87171', '#ef4444'].map((color) => (
-                    <label key={color} className="cursor-pointer">
-                      <input
-                        {...register('color')}
-                        type="radio"
-                        value={color}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`w-8 h-8 rounded-lg border-2 transition-all duration-200 hover:scale-110 ${
-                          selectedColor === color
-                            ? 'border-indigo-500 shadow-md scale-110'
-                            : 'border-slate-300 dark:border-slate-600'
-                        }`}
-                        style={{ backgroundColor: color }}
-                        title={color}
-                      />
-                    </label>
-                  ))}
-                </div>
+                <Controller
+                  name="color"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {['#ffffff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#fef3c7', '#fde68a', '#fcd34d', '#fbbf24', '#f59e0b', '#d97706', '#dcfce7', '#bbf7d0', '#86efac', '#4ade80', '#22c55e', '#fecaca', '#fca5a5', '#f87171', '#ef4444'].map((color) => (
+                        <label key={color} className="cursor-pointer">
+                          <input
+                            {...field}
+                            type="radio"
+                            value={color}
+                            checked={field.value === color}
+                            onChange={() => field.onChange(color)}
+                            className="sr-only"
+                          />
+                          <div
+                            className={`w-8 h-8 rounded-lg border-2 transition-all duration-200 hover:scale-110 ${
+                              field.value === color
+                                ? 'border-indigo-500 shadow-md scale-110'
+                                : 'border-slate-300 dark:border-slate-600'
+                            }`}
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                />
               </div>
             </div>
 
@@ -236,31 +253,34 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
                         />
                       </div>
 
-                      {/* Type - Radix Select */}
+                      {/* Type - Radix Select with Controller */}
                       <div className="w-40">
-                        <SelectRoot
-                          value={watch(`attributes.${index}.type`)}
-                          onValueChange={(value) => {
-                            // @ts-ignore - updating nested array field
-                            setValue(`attributes.${index}.type`, value as any);
-                          }}
-                        >
-                          <Trigger className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all flex items-center justify-between">
-                            <Value placeholder="Select type" />
-                            <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
-                          </Trigger>
-                          <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-                            {DATA_TYPES.map((type) => (
-                              <Item
-                                key={type.value}
-                                value={type.value}
-                                className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50"
-                              >
-                                {type.label}
-                              </Item>
-                            ))}
-                          </Content>
-                        </SelectRoot>
+                        <Controller
+                          name={`attributes.${index}.type`}
+                          control={control}
+                          render={({ field }) => (
+                            <SelectRoot
+                              value={field.value}
+                              onValueChange={(value) => field.onChange(value)}
+                            >
+                              <Trigger className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all flex items-center justify-between">
+                                <Value placeholder="Select type" />
+                                <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                              </Trigger>
+                              <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                {DATA_TYPES.map((type) => (
+                                  <Item
+                                    key={type.value}
+                                    value={type.value}
+                                    className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50"
+                                  >
+                                    {type.label}
+                                  </Item>
+                                ))}
+                              </Content>
+                            </SelectRoot>
+                          )}
+                        />
                       </div>
 
                       {/* Remove Button */}
@@ -293,7 +313,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
                       />
                     </div>
 
-                    {errors.attributes?.[index]?.name && (
+                    {errors.attributes?.[index] && (
                       <p className="text-xs text-rose-600 dark:text-rose-400">
                         {errors.attributes[index]?.name?.message}
                       </p>
@@ -314,7 +334,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
           <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
             <Button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               variant="outline"
             >
               Cancel
@@ -325,7 +345,7 @@ export function EntityFormModal({ isOpen, onClose, onSubmit, initialData }: Enti
               variant="primary"
               isLoading={isSubmitting}
             >
-              {initialData ? 'Update Entity' : 'Create Entity'}
+              {isEditMode ? 'Update Entity' : 'Create Entity'}
             </Button>
           </div>
         </form>
