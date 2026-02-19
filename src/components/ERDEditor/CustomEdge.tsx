@@ -48,7 +48,6 @@ export const CustomEdge = memo(
   ({ id, sourceX, sourceY, targetX, targetY, selected, data, style }: CustomEdgeProps) => {
     const { getViewport } = useReactFlow();
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-    const [isDraggingLabel, setIsDraggingLabel] = useState(false);
     const isDraggingControlPoint = useRef(false);
 
     const edgeType = (data?.label as EdgeType) || '1:N';
@@ -155,15 +154,11 @@ export const CustomEdge = memo(
       document.addEventListener('mouseup', handleMouseUp);
     }, [id, getViewport]);
 
-    const handleLabelMouseDown = useCallback((e: React.MouseEvent) => {
-      if (!selected) return; // Only allow dragging when edge is selected
+    const handleLabelPositionDrag = useCallback((_position: 'start' | 'end', e: React.MouseEvent) => {
+      if (!selected) return;
 
       e.stopPropagation();
       e.preventDefault();
-      setIsDraggingLabel(true);
-
-      // Don't update position on click - wait for actual drag movement
-      let isDragging = false;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
@@ -271,31 +266,20 @@ export const CustomEdge = memo(
           }
         }
 
-        // Only update if we're actually dragging (moved after initial click)
-        if (isDragging) {
-          const updateEvent = new CustomEvent('update-edge-label-position', {
-            detail: { edgeId: id, x: constrainedX, y: constrainedY }
-          });
-          window.dispatchEvent(updateEvent);
-        }
+        const updateEvent = new CustomEvent('update-edge-label-position', {
+          detail: { edgeId: id, x: constrainedX, y: constrainedY }
+        });
+        window.dispatchEvent(updateEvent);
       };
 
       const handleMouseUp = () => {
-        setIsDraggingLabel(false);
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };
 
-      // Mark as dragging after a short delay to skip the initial click
-      setTimeout(() => {
-        if (isDraggingLabel) {
-          isDragging = true;
-        }
-      }, 100);
-
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-    }, [id, selected, getViewport, sourceX, sourceY, targetX, targetY, edgeStyleType, controlPoint, isDraggingLabel]);
+    }, [id, selected, getViewport, sourceX, sourceY, targetX, targetY, edgeStyleType, controlPoint]);
 
     return (
       <>
@@ -340,6 +324,42 @@ export const CustomEdge = memo(
             </g>
           )}
 
+          {/* Label position handles - visible when selected */}
+          {selected && (
+            <>
+              {/* Start handle */}
+              <g
+                style={{ cursor: 'grab' }}
+                onMouseDown={(e) => handleLabelPositionDrag('start', e)}
+              >
+                <circle
+                  cx={sourceX}
+                  cy={sourceY}
+                  r={5}
+                  fill="#f59e0b"
+                  stroke="white"
+                  strokeWidth={2}
+                  className="hover:r-7 transition-all duration-200 opacity-80 hover:opacity-100"
+                />
+              </g>
+              {/* End handle */}
+              <g
+                style={{ cursor: 'grab' }}
+                onMouseDown={(e) => handleLabelPositionDrag('end', e)}
+              >
+                <circle
+                  cx={targetX}
+                  cy={targetY}
+                  r={5}
+                  fill="#f59e0b"
+                  stroke="white"
+                  strokeWidth={2}
+                  className="hover:r-7 transition-all duration-200 opacity-80 hover:opacity-100"
+                />
+              </g>
+            </>
+          )}
+
           {/* Hover overlay (invisible but wider for easier clicking) */}
           <path
             d={edgePath}
@@ -358,7 +378,6 @@ export const CustomEdge = memo(
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelPosition.x}px, ${labelPosition.y}px)`,
               pointerEvents: 'all',
-              cursor: selected ? 'grab' : 'default',
             }}
             className={cn(
               'px-2 py-1 text-xs font-semibold rounded-lg transition-all duration-200',
@@ -370,16 +389,11 @@ export const CustomEdge = memo(
               edgeType === '1:1' && 'text-blue-600 dark:text-blue-400',
               edgeType === '1:N' && 'text-violet-600 dark:text-violet-400',
               edgeType === 'N:1' && 'text-violet-600 dark:text-violet-400',
-              edgeType === 'N:M' && 'text-pink-600 dark:text-pink-400',
-              isDraggingLabel && 'cursor-grabbing'
+              edgeType === 'N:M' && 'text-pink-600 dark:text-pink-400'
             )}
             onContextMenu={handleContextMenu}
-            onMouseDown={handleLabelMouseDown}
           >
             {edgeType}
-            {selected && (
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full opacity-50" />
-            )}
           </div>
         </EdgeLabelRenderer>
 
