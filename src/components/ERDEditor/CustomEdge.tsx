@@ -173,57 +173,67 @@ export const CustomEdge = memo(
         const mouseX = (moveEvent.clientX - reactFlowBounds.left - viewport.x) / viewport.zoom;
         const mouseY = (moveEvent.clientY - reactFlowBounds.top - viewport.y) / viewport.zoom;
 
-        // Find the closest point on the edge path to constrain the label
+        // Find the closest point on the edge path
         let constrainedX = mouseX;
         let constrainedY = mouseY;
 
         if (edgeStyleType === 'straight') {
-          // For straight lines, project point onto line segment
+          // Project onto the line segment
           const dx = targetX - sourceX;
           const dy = targetY - sourceY;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          if (length > 0) {
-            const t = Math.max(0, Math.min(1, ((mouseX - sourceX) * dx + (mouseY - sourceY) * dy) / (length * length)));
-            constrainedX = sourceX + t * dx;
-            constrainedY = sourceY + t * dy;
+          const lengthSq = dx * dx + dy * dy;
+          if (lengthSq > 0) {
+            const t = ((mouseX - sourceX) * dx + (mouseY - sourceY) * dy) / lengthSq;
+            const clampedT = Math.max(0, Math.min(1, t));
+            constrainedX = sourceX + clampedT * dx;
+            constrainedY = sourceY + clampedT * dy;
           }
         } else if (edgeStyleType === 'orthogonal') {
-          // For orthogonal paths, constrain to the horizontal/vertical segments
+          // Orthogonal path: horizontal -> vertical -> horizontal
           const midX = (sourceX + targetX) / 2;
           
-          // Determine which segment is closest
-          const distToHorizontal = Math.abs(mouseY - sourceY);
-          const distToVertical = Math.abs(mouseX - midX);
+          // Determine which segment the mouse is closest to
+          const dTopHoriz = Math.abs(mouseY - sourceY) + (mouseX < Math.min(sourceX, targetX) || mouseX > Math.max(sourceX, targetX) ? 1000 : 0);
+          const dBottomHoriz = Math.abs(mouseY - targetY) + (mouseX < Math.min(sourceX, targetX) || mouseX > Math.max(sourceX, targetX) ? 1000 : 0);
+          const dVert = Math.abs(mouseX - midX) + (mouseY < Math.min(sourceY, targetY) || mouseY > Math.max(sourceY, targetY) ? 1000 : 0);
           
-          if (distToHorizontal < distToVertical) {
-            // Constrain to horizontal segments
+          const minD = Math.min(dTopHoriz, dBottomHoriz, dVert);
+          
+          if (minD === dTopHoriz) {
             constrainedX = Math.max(Math.min(sourceX, targetX), Math.min(Math.max(sourceX, targetX), mouseX));
-            constrainedY = mouseY < (sourceY + targetY) / 2 ? sourceY : targetY;
+            constrainedY = sourceY;
+          } else if (minD === dBottomHoriz) {
+            constrainedX = Math.max(Math.min(sourceX, targetX), Math.min(Math.max(sourceX, targetX), mouseX));
+            constrainedY = targetY;
           } else {
-            // Constrain to vertical segment
             constrainedX = midX;
             constrainedY = Math.max(Math.min(sourceY, targetY), Math.min(Math.max(sourceY, targetY), mouseY));
           }
         } else {
-          // For smoothstep, find closest point on the path
+          // Smoothstep: project onto one of the segments
           const midX = controlPoint.x;
-          const midY = controlPoint.y;
-
-          // Simple approach: project to one of the three segments
-          // Segment 1: horizontal from source to midX
-          if (mouseY < (sourceY + midY) / 2 && Math.abs(mouseX - midX) > Math.abs(mouseY - sourceY)) {
+          
+          // Calculate distances to each segment
+          // Segment 1: horizontal at sourceY, from sourceX to midX
+          const d1 = Math.abs(mouseY - sourceY) + (mouseX < Math.min(sourceX, midX) || mouseX > Math.max(sourceX, midX) ? 1000 : 0);
+          
+          // Segment 2: vertical at midX, from sourceY to targetY
+          const d2 = Math.abs(mouseX - midX) + (mouseY < Math.min(sourceY, targetY) || mouseY > Math.max(sourceY, targetY) ? 1000 : 0);
+          
+          // Segment 3: horizontal at targetY, from midX to targetX
+          const d3 = Math.abs(mouseY - targetY) + (mouseX < Math.min(midX, targetX) || mouseX > Math.max(midX, targetX) ? 1000 : 0);
+          
+          const minD = Math.min(d1, d2, d3);
+          
+          if (minD === d1) {
             constrainedX = Math.max(Math.min(sourceX, midX), Math.min(Math.max(sourceX, midX), mouseX));
             constrainedY = sourceY;
-          }
-          // Segment 3: horizontal from midX to target
-          else if (mouseY > (midY + targetY) / 2 && Math.abs(mouseX - midX) > Math.abs(mouseY - targetY)) {
+          } else if (minD === d2) {
+            constrainedX = midX;
+            constrainedY = Math.max(Math.min(sourceY, targetY), Math.min(Math.max(sourceY, targetY), mouseY));
+          } else {
             constrainedX = Math.max(Math.min(midX, targetX), Math.min(Math.max(midX, targetX), mouseX));
             constrainedY = targetY;
-          }
-          // Segment 2: vertical through midX
-          else {
-            constrainedX = midX;
-            constrainedY = Math.max(Math.min(sourceY, targetY, midY), Math.min(Math.max(sourceY, targetY, midY), mouseY));
           }
         }
 
