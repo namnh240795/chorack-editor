@@ -3,7 +3,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Plus, Trash2, Database, ChevronDown, Link2, Link2Off } from 'lucide-react';
-import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
+import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import type { Node, Edge } from 'reactflow';
@@ -378,7 +378,7 @@ export function EntityFormModal({
                                     value={type.value}
                                     className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50"
                                   >
-                                    {type.label}
+                                    <ItemText>{type.label}</ItemText>
                                   </Item>
                                 ))}
                               </Content>

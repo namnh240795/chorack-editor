@@ -2,7 +2,7 @@ import { memo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps, useReactFlow } from 'reactflow';
 import type { Node } from 'reactflow';
-import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
+import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
 
 export interface Attribute {
   name: string;
@@ -451,19 +451,19 @@ export const EntityNode = memo(({ data, selected, id }: NodeProps<EntityNodeData
                   </Trigger>
                   <Content className="z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                     <Item value="String" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      String
+                      <ItemText>String</ItemText>
                     </Item>
                     <Item value="Number" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Number
+                      <ItemText>Number</ItemText>
                     </Item>
                     <Item value="Boolean" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Boolean
+                      <ItemText>Boolean</ItemText>
                     </Item>
                     <Item value="Date" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Date
+                      <ItemText>Date</ItemText>
                     </Item>
                     <Item value="Text" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Text
+                      <ItemText>Text</ItemText>
                     </Item>
                   </Content>
                 </SelectRoot>

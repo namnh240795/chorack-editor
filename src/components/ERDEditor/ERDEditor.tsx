@@ -15,7 +15,7 @@ import {
 import 'reactflow/dist/style.css';
 import { EntityNode } from '../../components/TiptapEditor/nodes/EntityNode';
 import { Database, Save, Trash2, Download, Upload, Plus, Maximize, Edit3, Code2, ZoomIn, ZoomOut, Monitor, ChevronDown } from 'lucide-react';
-import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
+import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
 import { EntityFormModal, type EntityFormData } from './EntityFormModal';
 import type { EdgeType } from './EdgeTypeSelector';
 import { Button } from '../../components/ui/Button';
@@ -539,22 +539,22 @@ export function ERDEditor({ onSave, initialNodes = [], initialEdges = [] }: ERDE
                   </Trigger>
                   <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-lg shadow-lg">
                     <Item value="hierarchical" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Hierarchical
+                      <ItemText>Hierarchical</ItemText>
                     </Item>
                     <Item value="topDown" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Top Down
+                      <ItemText>Top Down</ItemText>
                     </Item>
                     <Item value="compact" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Compact
+                      <ItemText>Compact</ItemText>
                     </Item>
                     <Item value="spacious" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Spacious
+                      <ItemText>Spacious</ItemText>
                     </Item>
                     <Item value="force" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Force
+                      <ItemText>Force</ItemText>
                     </Item>
                     <Item value="radial" className="px-3 py-2 text-sm text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                      Radial
+                      <ItemText>Radial</ItemText>
                     </Item>
                   </Content>
                 </SelectRoot>

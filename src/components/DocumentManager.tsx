@@ -22,7 +22,7 @@ import {
   Database,
   ChevronDown,
 } from 'lucide-react';
-import { Root as SelectRoot, Trigger, Value, Content, Item } from '@radix-ui/react-select';
+import { Root as SelectRoot, Trigger, Value, Content, Item, ItemText } from '@radix-ui/react-select';
 
 type ViewMode = 'grid' | 'list';
 type SortBy = 'title' | 'createdAt' | 'updatedAt';
@@ -262,13 +262,13 @@ export function DocumentManager({ onOpenDocument, onOpenERDEditor }: DocumentMan
               </Trigger>
               <Content className="z-50 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-lg">
                 <Item value="updatedAt" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                  Last Modified
+                  <ItemText>Last Modified</ItemText>
                 </Item>
                 <Item value="createdAt" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                  Date Created
+                  <ItemText>Date Created</ItemText>
                 </Item>
                 <Item value="title" className="px-4 py-3 text-slate-900 dark:text-slate-100 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer data-[state=checked]:bg-indigo-100 dark:data-[state=checked]:bg-indigo-900/50">
-                  Name (A-Z)
+                  <ItemText>Name (A-Z)</ItemText>
                 </Item>
               </Content>
             </SelectRoot>
