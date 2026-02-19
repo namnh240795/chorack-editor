@@ -170,11 +170,65 @@ export const CustomEdge = memo(
         const viewport = getViewport();
 
         // Convert screen coordinates to flow coordinates (accounting for zoom and pan)
-        const flowX = (moveEvent.clientX - reactFlowBounds.left - viewport.x) / viewport.zoom;
-        const flowY = (moveEvent.clientY - reactFlowBounds.top - viewport.y) / viewport.zoom;
+        const mouseX = (moveEvent.clientX - reactFlowBounds.left - viewport.x) / viewport.zoom;
+        const mouseY = (moveEvent.clientY - reactFlowBounds.top - viewport.y) / viewport.zoom;
+
+        // Find the closest point on the edge path to constrain the label
+        let constrainedX = mouseX;
+        let constrainedY = mouseY;
+
+        if (edgeStyleType === 'straight') {
+          // For straight lines, project point onto line segment
+          const dx = targetX - sourceX;
+          const dy = targetY - sourceY;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          if (length > 0) {
+            const t = Math.max(0, Math.min(1, ((mouseX - sourceX) * dx + (mouseY - sourceY) * dy) / (length * length)));
+            constrainedX = sourceX + t * dx;
+            constrainedY = sourceY + t * dy;
+          }
+        } else if (edgeStyleType === 'orthogonal') {
+          // For orthogonal paths, constrain to the horizontal/vertical segments
+          const midX = (sourceX + targetX) / 2;
+          
+          // Determine which segment is closest
+          const distToHorizontal = Math.abs(mouseY - sourceY);
+          const distToVertical = Math.abs(mouseX - midX);
+          
+          if (distToHorizontal < distToVertical) {
+            // Constrain to horizontal segments
+            constrainedX = Math.max(Math.min(sourceX, targetX), Math.min(Math.max(sourceX, targetX), mouseX));
+            constrainedY = mouseY < (sourceY + targetY) / 2 ? sourceY : targetY;
+          } else {
+            // Constrain to vertical segment
+            constrainedX = midX;
+            constrainedY = Math.max(Math.min(sourceY, targetY), Math.min(Math.max(sourceY, targetY), mouseY));
+          }
+        } else {
+          // For smoothstep, find closest point on the path
+          const midX = controlPoint.x;
+          const midY = controlPoint.y;
+
+          // Simple approach: project to one of the three segments
+          // Segment 1: horizontal from source to midX
+          if (mouseY < (sourceY + midY) / 2 && Math.abs(mouseX - midX) > Math.abs(mouseY - sourceY)) {
+            constrainedX = Math.max(Math.min(sourceX, midX), Math.min(Math.max(sourceX, midX), mouseX));
+            constrainedY = sourceY;
+          }
+          // Segment 3: horizontal from midX to target
+          else if (mouseY > (midY + targetY) / 2 && Math.abs(mouseX - midX) > Math.abs(mouseY - targetY)) {
+            constrainedX = Math.max(Math.min(midX, targetX), Math.min(Math.max(midX, targetX), mouseX));
+            constrainedY = targetY;
+          }
+          // Segment 2: vertical through midX
+          else {
+            constrainedX = midX;
+            constrainedY = Math.max(Math.min(sourceY, targetY, midY), Math.min(Math.max(sourceY, targetY, midY), mouseY));
+          }
+        }
 
         const updateEvent = new CustomEvent('update-edge-label-position', {
-          detail: { edgeId: id, x: flowX, y: flowY }
+          detail: { edgeId: id, x: constrainedX, y: constrainedY }
         });
         window.dispatchEvent(updateEvent);
       };
@@ -187,7 +241,7 @@ export const CustomEdge = memo(
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-    }, [id, selected, getViewport]);
+    }, [id, selected, getViewport, sourceX, sourceY, targetX, targetY, edgeStyleType, controlPoint]);
 
     return (
       <>
